@@ -57,12 +57,7 @@
           "microphonePermission": "Allow myApp to access your microphone to record voice messages."
         }
       ],
-      [
-        "expo-barcode-scanner",
-        {
-          "cameraPermission": "Allow myApp to access your camera to scan QR codes."
-        }
-      ],
+
       [
         "expo-location",
         {
@@ -70,5 +65,6 @@
         }
       ]
     ]
+    
   }
 }

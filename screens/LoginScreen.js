@@ -6,6 +6,7 @@ import { authApi } from '../services/authApi';
 import AuthContainer from '../components/auth/AuthContainer';
 import AnimatedInput from '../components/auth/AnimatedInput';
 import LoadingOverlay from '../components/auth/LoadingOverlay';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Add this import
 
 export default function LoginScreen({ navigation }) {
   const { saveToken } = useAuth();
@@ -14,6 +15,8 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  // Add this debug line right after imports
+  console.log('authApi imported:', authApi);
 
   const animateError = () => {
     Animated.sequence([
@@ -24,36 +27,49 @@ export default function LoginScreen({ navigation }) {
     ]).start();
   };
 
-  const handleLogin = async () => {
-    if (!username.trim() || !password) {
-      animateError();
-      Alert.alert('Missing Information', 'Please enter both username and password');
-      return;
-    }
+// In LoginScreen.js, add more logging
+// In LoginScreen.js handleLogin function
+const handleLogin = async () => {
+  console.log('Login button pressed!');
+  console.log('Username:', username, 'Password:', password.length > 0 ? '***' : 'empty');
+  
+  if (!username.trim() || !password) {
+    animateError();
+    // Remove the Alert.alert - just animate the error
+    return;
+  }
 
-    setLoading(true);
-    try {
-      const response = await authApi.remoteLogin({
-        username: username.trim().toLowerCase(),
-        password: password,
-      });
+  setLoading(true);
+  console.log('Starting login process...');
+  
+  try {
+    const response = await authApi.remoteLogin({
+      username: username.trim(),
+      password: password,
+    });
 
-      if (response.accessToken) {
-        await saveToken(response.accessToken);
-      }
-    } catch (error) {
-      animateError();
-      let errorMessage = 'Invalid username or password';
+    console.log('Login response in screen:', response);
+
+    if (response.accessToken) {
+      console.log('Saving token...');
+      await saveToken(response.accessToken);
+      console.log('Token saved successfully');
       
-      if (!error.response) {
-        errorMessage = 'Connection error. Please check your internet.';
-      }
-      
-      Alert.alert('Login Failed', errorMessage);
-    } finally {
-      setLoading(false);
+      // Verify token was saved
+      const savedToken = await AsyncStorage.getItem('authToken');
+      console.log('Verified token in storage:', savedToken ? 'Yes' : 'No');
     }
-  };
+  } catch (error) {
+
+    animateError();
+    
+    // Remove Alert.alert - errors are now suppressed
+    // The error is already handled silently by the error manager
+    
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>

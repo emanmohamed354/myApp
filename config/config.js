@@ -22,7 +22,7 @@ const getEnvVars = (env = Constants.manifest?.releaseChannel) => {
   return ENV.dev; 
 };
 
-// Export as a function that can be updated
+// Export as an object with all needed methods
 export default {
   ...getEnvVars(),
   updateLocalIp: async (ip) => {
@@ -31,5 +31,9 @@ export default {
   getLocalApiUrl: async () => {
     const ip = await AsyncStorage.getItem('localIpAddress');
     return ip ? `http://${ip}:3000` : 'http://192.168.1.5:3000';
+  },
+  getRemoteApiUrl: async () => {
+    const envVars = getEnvVars();
+    return envVars.remoteUrl;
   }
 };

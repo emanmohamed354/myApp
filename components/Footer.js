@@ -3,11 +3,11 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import tw from 'twrnc';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotificationState } from '../contexts/NotificationStateContext';
 import { useAuth } from '../contexts/AuthContext';
 
 const Footer = ({ state, descriptors, navigation }) => {
-  const { unreadCount } = useNotifications();
+  const { unreadCount } = useNotificationState();
   const { isCarPaired } = useAuth();
   
   // Get the current route name
@@ -15,6 +15,7 @@ const Footer = ({ state, descriptors, navigation }) => {
 
   const menuItems = [
     { name: 'Home', icon: 'home', iconSet: 'Ionicons', screen: 'Home', showWhenNotPaired: true, showWhenPaired: true },
+    { name: 'Sync', icon: 'sync', iconSet: 'Ionicons', screen: 'PairingSync', showWhenNotPaired: true, showWhenPaired: false },
     { name: 'Logs', icon: 'text-box-multiple', iconSet: 'MaterialCommunityIcons', screen: 'Logs', showWhenNotPaired: false, showWhenPaired: true },
     { name: 'Info', icon: 'info-circle', iconSet: 'FontAwesome5', screen: 'Info', showWhenNotPaired: false, showWhenPaired: true },
     { name: 'AI', icon: 'psychology', iconSet: 'MaterialIcons', screen: 'LLM', showWhenNotPaired: false, showWhenPaired: true },

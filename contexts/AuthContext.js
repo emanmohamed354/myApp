@@ -1,8 +1,9 @@
 // contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../services/api';
+import apiInstance from '../services/apiInstance';
 import { authApi } from '../services/authApi';
+import errorManager from '../services/errorManager';
 
 const AuthContext = createContext({});
 
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }) => {
       
       return JSON.parse(jsonPayload);
     } catch (error) {
-      console.error('Error decoding token:', error);
+      errorManager.handleError(error, 'decodeToken');
       return null;
     }
   };
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }) => {
     return payload.exp * 1000;
   };
 
-  // NEW FUNCTION: Check pairing status in AsyncStorage
+  // Check pairing status in AsyncStorage
   const checkPairingStatus = async () => {
     try {
       const storedPairingStatus = await AsyncStorage.getItem('isCarPaired');
@@ -80,7 +81,7 @@ export const AuthProvider = ({ children }) => {
         setLocalToken(storedLocalToken);
       }
     } catch (error) {
-      console.error('Error checking pairing status:', error);
+      errorManager.handleError(error, 'checkPairingStatus');
     }
   };
 
@@ -107,10 +108,10 @@ export const AuthProvider = ({ children }) => {
         }
         throw new Error('No access token in refresh response');
       } catch (error) {
-        console.error('Failed to refresh local token:', error);
-        // Clear local token if refresh fails
+        // Handle error silently
+        errorManager.handleError(error, 'refreshLocalToken');
         await clearLocalToken();
-        throw error;
+        return null;
       } finally {
         setIsRefreshing(false);
         localTokenRefreshPromise.current = null;
@@ -123,7 +124,7 @@ export const AuthProvider = ({ children }) => {
   // Fetch user profile from remote backend
   const fetchUserProfile = async () => {
     try {
-      const profile = await api.get('/auth/me');
+      const profile = await authApi.getUserProfile();
       console.log('User profile fetched:', profile);
       
       setUserInfo({
@@ -139,27 +140,30 @@ export const AuthProvider = ({ children }) => {
       
       return profile;
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      // Handle error silently
+      errorManager.handleError(error, 'fetchUserProfile');
       
-      // If remote token is expired or invalid, clear everything
-      if (error.response?.status === 401) {
+      // If remote token is expired or invalid, clear everything silently
+      if (error.response?.status === 401 || error.errorType === 'auth') {
         await clearToken();
         return;
       }
       
       // Fall back to token data
-      const payload = decodeToken(remoteToken);
-      if (payload) {
-        setUserInfo({
-          id: payload.sub,
-          userId: payload.sub,
-          username: payload.sub || 'User',
-        });
+      if (remoteToken) {
+        const payload = decodeToken(remoteToken);
+        if (payload) {
+          setUserInfo({
+            id: payload.sub,
+            userId: payload.sub,
+            username: payload.sub || 'User',
+          });
+        }
       }
     }
   };
 
-  // NEW FUNCTION: Complete the pairing flow
+  // Complete the pairing flow
   const completePairing = async (carPayload) => {
     try {
       const result = await authApi.completePairingFlow(carPayload, (accessToken) => {
@@ -170,14 +174,26 @@ export const AuthProvider = ({ children }) => {
       });
       return result;
     } catch (error) {
-      console.error('Error in completePairing:', error);
+      errorManager.handleError(error, 'completePairing');
       throw error;
     }
   };
 
-  // Load tokens and pairing status from storage on app start
+  // Initialize API instances and load auth data
   useEffect(() => {
-    loadAuthData();
+    const initializeAndLoad = async () => {
+      try {
+        // Initialize API instances first
+        await apiInstance.initialize();
+        // Then load auth data
+        await loadAuthData();
+      } catch (error) {
+        errorManager.handleError(error, 'AuthContext.initialize');
+        setLoading(false);
+      }
+    };
+
+    initializeAndLoad();
   }, []);
 
   // Periodically check pairing status for external changes
@@ -191,7 +207,16 @@ export const AuthProvider = ({ children }) => {
       const savedRemoteToken = await AsyncStorage.getItem('authToken');
       const savedLocalToken = await AsyncStorage.getItem('localAuthToken');
       const carPairingStatus = await AsyncStorage.getItem('isCarPaired');
-      
+      // Defensive: wipe any stale data if both tokens are missing
+      if (!savedRemoteToken && !savedLocalToken) {
+        console.log('No tokens — clearing sync data to be safe');
+        await syncService.clearSyncData?.();
+
+        setTimeout(() => {
+          setSyncData?.(null);
+        }, 0);
+      }
+
       if (savedRemoteToken && !isTokenExpired(savedRemoteToken)) {
         setRemoteToken(savedRemoteToken);
         
@@ -209,7 +234,7 @@ export const AuthProvider = ({ children }) => {
           try {
             await refreshLocalTokenIfNeeded();
           } catch (error) {
-            console.error('Failed to refresh local token on load');
+            errorManager.handleError(error, 'loadAuthData-refresh');
           }
         } else {
           setLocalToken(savedLocalToken);
@@ -220,33 +245,37 @@ export const AuthProvider = ({ children }) => {
       setIsCarPaired(carPairingStatus === 'true');
       
     } catch (error) {
-      console.error('Error loading auth data:', error);
+      errorManager.handleError(error, 'loadAuthData');
     } finally {
       setLoading(false);
     }
   };
-
-  const saveToken = async (newToken) => {
-    try {
-      if (!newToken) {
-        throw new Error('No token provided');
-      }
-
-      if (isTokenExpired(newToken)) {
-        throw new Error('Token is already expired');
-      }
-
-      await AsyncStorage.setItem('authToken', newToken);
-      setRemoteToken(newToken);
-      
-      // Fetch user profile after saving token
-      await fetchUserProfile();
-      
-    } catch (error) {
-      console.error('Error saving token:', error);
-      throw error;
+// In AuthContext.js
+const saveToken = async (newToken) => {
+  try {
+    console.log('AuthContext - Saving token:', newToken);
+    
+    if (!newToken) {
+      throw new Error('No token provided');
     }
-  };
+
+    if (isTokenExpired(newToken)) {
+      throw new Error('Token is already expired');
+    }
+
+    await AsyncStorage.setItem('authToken', newToken);
+    setRemoteToken(newToken);
+    console.log('AuthContext - Token saved, isAuthenticated should be true');
+    
+    // Fetch user profile after saving token
+    await fetchUserProfile();
+    
+  } catch (error) {
+    console.error('AuthContext - Error saving token:', error);
+    errorManager.handleError(error, 'saveToken');
+    throw error;
+  }
+};
 
   const saveLocalToken = async (newToken) => {
     try {
@@ -264,7 +293,7 @@ export const AuthProvider = ({ children }) => {
       // Schedule next refresh
       scheduleLocalTokenRefresh(newToken);
     } catch (error) {
-      console.error('Error saving local token:', error);
+      errorManager.handleError(error, 'saveLocalToken');
       throw error;
     }
   };
@@ -274,29 +303,23 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.setItem('isCarPaired', isPaired ? 'true' : 'false');
       setIsCarPaired(isPaired);
     } catch (error) {
-      console.error('Error saving car pairing status:', error);
+      errorManager.handleError(error, 'setCarPaired');
     }
   };
 
   const clearToken = async () => {
     try {
-      await AsyncStorage.multiRemove([
-        'authToken', 
-        'localAuthToken', 
-        'isCarPaired',
-        'carRefreshToken',
-        'payloadData'
-      ]);
+      await AsyncStorage.clear();
       setRemoteToken(null);
       setLocalToken(null);
       setUserInfo(null);
       setIsCarPaired(false);
     } catch (error) {
-      console.error('Error clearing auth data:', error);
+      errorManager.handleError(error, 'clearToken');
     }
   };
 
-  // New function to clear only local token and unpair vehicle
+  // Clear only local token and unpair vehicle
   const clearLocalToken = async () => {
     try {
       await AsyncStorage.multiRemove([
@@ -309,7 +332,7 @@ export const AuthProvider = ({ children }) => {
       setIsCarPaired(false);
       // Keep remote token and user info intact
     } catch (error) {
-      console.error('Error clearing local token:', error);
+      errorManager.handleError(error, 'clearLocalToken');
       throw error;
     }
   };
@@ -332,7 +355,7 @@ export const AuthProvider = ({ children }) => {
         try {
           await refreshLocalTokenIfNeeded();
         } catch (error) {
-          console.error('Scheduled token refresh failed:', error);
+          errorManager.handleError(error, 'scheduleLocalTokenRefresh');
         }
       }, timeUntilRefresh);
     }
@@ -344,7 +367,7 @@ export const AuthProvider = ({ children }) => {
       // Check remote token
       if (remoteToken && isTokenExpired(remoteToken)) {
         console.log('Remote token expired - clearing all tokens');
-        await clearToken(); // Clear everything if remote token expires
+        await clearToken(); // Clear everything
         return;
       }
       
@@ -355,7 +378,7 @@ export const AuthProvider = ({ children }) => {
             await refreshLocalTokenIfNeeded();
           }
         } catch (error) {
-          console.error('Failed to refresh local token in periodic check');
+          errorManager.handleError(error, 'checkTokenExpiry');
         }
       }
     };
@@ -367,9 +390,9 @@ export const AuthProvider = ({ children }) => {
 
   // Add interceptor to handle token refresh on 401 errors
   useEffect(() => {
-    if (!api.localApi) return;
+    if (!apiInstance.initialized || !apiInstance.localApi) return;
 
-    const interceptorId = api.localApi.interceptors.response.use(
+    const interceptorId = apiInstance.localApi.interceptors.response.use(
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
@@ -386,17 +409,21 @@ export const AuthProvider = ({ children }) => {
 
           try {
             const newToken = await refreshLocalTokenIfNeeded();
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            return api.localApi(originalRequest);
+            if (newToken) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              return apiInstance.localApi(originalRequest);
+            }
           } catch (refreshError) {
-            // Refresh failed, clear local token
+            errorManager.handleError(refreshError, 'interceptor-refresh');
             await clearLocalToken();
             return Promise.reject(refreshError);
           }
         }
 
         // If remote API returns 401, clear everything
-        if (error.response?.status === 401 && error.config.baseURL === api.remoteApi.defaults.baseURL) {
+        if (error.response?.status === 401 && 
+            apiInstance.remoteApi && 
+            error.config.baseURL === apiInstance.remoteApi.defaults.baseURL) {
           console.log('Remote token invalid - clearing all tokens');
           await clearToken();
         }
@@ -407,9 +434,11 @@ export const AuthProvider = ({ children }) => {
 
     // Cleanup
     return () => {
-      api.localApi.interceptors.response.eject(interceptorId);
+      if (apiInstance.localApi) {
+        apiInstance.localApi.interceptors.response.eject(interceptorId);
+      }
     };
-  }, [localToken, isCarPaired]);
+  }, [localToken, isCarPaired, apiInstance.initialized]);
 
   const value = {
     // Backward compatibility
@@ -439,8 +468,8 @@ export const AuthProvider = ({ children }) => {
     clearLocalToken,
     refreshUserProfile: fetchUserProfile,
     refreshLocalToken: refreshLocalTokenIfNeeded,
-    checkPairingStatus, // Added this
-    completePairing    // Added this
+    checkPairingStatus,
+    completePairing
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

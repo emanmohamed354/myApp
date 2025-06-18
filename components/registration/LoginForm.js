@@ -42,7 +42,7 @@ const LoginForm = ({ navigation }) => {
     setLoading(true);
     try {
       const loginResponse = await authApi.remoteLogin({
-        username: username.trim().toLowerCase(),
+        username: username.trim(),
         password: password
       });
 

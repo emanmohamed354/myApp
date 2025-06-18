@@ -1,188 +1,168 @@
-// services/api.js
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Config from '../config/config';
+import apiInstance from './apiInstance';
+import errorManager from './errorManager';
 
 class ApiService {
   constructor() {
-    this.initializeApis();
-    this.setupInterceptors();
+    this.interceptorsSetup = false;
   }
 
-  async initializeApis() {
-    // Get saved IP or use default
-    const localApiUrl = await Config.getLocalApiUrl();
-    
-    this.localApi = axios.create({
-      baseURL: localApiUrl,
-      timeout: 30000,
-    });
-    
-    this.remoteApi = axios.create({
-      baseURL: Config.remoteUrl,
-      timeout: 30000,
-    });
-  }
-
-  // Add method to update base URL dynamically
-  updateBaseUrl(newUrl) {
-    if (this.localApi) {
-      this.localApi.defaults.baseURL = newUrl;
+  async ensureInitialized() {
+    if (!apiInstance.initialized) {
+      await apiInstance.initialize();
+    }
+    // Always setup interceptors when making a request
+    if (!this.interceptorsSetup) {
+      this.setupInterceptors();
+      this.interceptorsSetup = true;
     }
   }
 
   setupInterceptors() {
-    // Wait for APIs to be initialized
-    setTimeout(() => {
-      if (!this.localApi || !this.remoteApi) return;
+    console.log('Setting up API interceptors');
+    
+    // Request interceptor
+    const requestInterceptor = async (config) => {
+      try {
+        // Determine which API is being used
+        const isRemoteApi = config.baseURL === apiInstance.remoteApi?.defaults.baseURL;
+        const isLocalApi = config.baseURL === apiInstance.localApi?.defaults.baseURL;
 
-      // Local API interceptor
-      this.localApi.interceptors.request.use(
-        async (config) => {
-          // Skip auth for endpoints that don't need it
-          const noAuthEndpoints = ['/api/auth/pairing-token', '/api/auth/qr-code'];
-          if (noAuthEndpoints.some(endpoint => config.url.includes(endpoint))) {
-            return config;
-          }
-          
-          const token = await AsyncStorage.getItem('localAuthToken');
-          if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-          }
-          return config;
-        },
-        (error) => Promise.reject(error)
-      );
-
-      // Remote API interceptor
-      this.remoteApi.interceptors.request.use(
-        async (config) => {
+        if (isRemoteApi) {
           const token = await AsyncStorage.getItem('authToken');
           if (token) {
+            config.headers = config.headers || {};
             config.headers.Authorization = `Bearer ${token}`;
+            console.log('Authorization header added');
           }
-          return config;
-        },
-        (error) => Promise.reject(error)
-      );
-
-      // Handle token expiry for both
-      [this.localApi, this.remoteApi].forEach(api => {
-        if (!api) return;
-        
-        api.interceptors.response.use(
-          (response) => response,
-          async (error) => {
-            // Don't log 401 errors during pairing phase
-            if (error.response?.status === 401) {
-              const isCarPaired = await AsyncStorage.getItem('isCarPaired');
-              if (isCarPaired !== 'true') {
-                // Silently fail during pairing
-                return Promise.reject(error);
-              }
-              
-              console.log('Token expired or invalid, clearing auth data');
-              await AsyncStorage.multiRemove(['authToken', 'localAuthToken', 'isCarPaired']);
-            }
-            return Promise.reject(error);
+        } else if (isLocalApi) {
+          const localToken = await AsyncStorage.getItem('localAuthToken');
+          if (localToken) {
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${localToken}`;
           }
-        );
-      });
-    }, 100);
-  }
+        }
+      } catch (error) {
+        console.log('Error in request interceptor:', error);
+      }
+      return config;
+    };
 
-  // Helper to determine which API to use
-  getApi(endpoint) {
-    // Ensure APIs are initialized
-    if (!this.localApi || !this.remoteApi) {
-      console.warn('APIs not initialized yet');
-      return null;
-    }
-
-    // Add /api/auth/me/settings to local endpoints
-    const localEndpoints = [
-      '/api/notifications',
-      '/api/sensors',
-      '/api/diagnostics',
-      '/api/auth/me/settings',
-      '/api/auth/pairing-token',
-      '/api/auth/register',
-      '/api/auth/qr-code',
-      '/api/obd/profile',
-      '/api/sync',
-      '/api/logs'
-    ];
-    
-    const remoteEndpoints = [
-      '/auth/login', 
-      '/auth/register', 
-      '/auth/me', 
-      '/auth/verify-pairing'
-    ];
-    
-    // Check if it's a local endpoint
-    const isLocal = localEndpoints.some(local => endpoint.includes(local));
-    const isRemote = remoteEndpoints.some(remote => endpoint.includes(remote));
-    
-    // If explicitly local or not explicitly remote, use local API
-    return isLocal || !isRemote ? this.localApi : this.remoteApi;
-  }
-
-  // Generic request method with better error handling
-  async request(method, endpoint, data = null, options = {}) {
-    // Wait for APIs to be initialized if needed
-    if (!this.localApi || !this.remoteApi) {
-      await this.initializeApis();
-    }
-
-    const api = this.getApi(endpoint);
-    
-    if (!api) {
-      throw new Error('API not initialized');
-    }
-    
-    try {
-      const response = await api.request({
-        method,
-        url: endpoint,
-        data,
-        ...options,
-      });
+    // Response interceptor
+    const responseInterceptor = (response) => {
+      // Return just the data
       return response.data;
-    } catch (error) {
-      // Don't log errors for notification endpoints during pairing
-      const isNotificationEndpoint = endpoint.includes('/notifications');
-      const isCarPaired = await AsyncStorage.getItem('isCarPaired');
+    };
+
+    // Error interceptor
+    const errorInterceptor = (error) => {
+      console.log('API Error interceptor:', error.response?.status, error.config?.url);
       
-      if (isNotificationEndpoint && isCarPaired !== 'true') {
-        // Silently fail for notifications during pairing
-        throw error;
-      }
+      // Handle errors silently
+      const handledError = errorManager.handleError(error, 'API');
       
-      // Only log non-401 errors or if car is paired
-      if (error.response?.status !== 401 || isCarPaired === 'true') {
-        console.error(`API Error ${method} ${endpoint}:`, error.message || error);
-      }
+      // Create a clean error object
+      const cleanError = {
+        ...error,
+        handled: true,
+        errorType: handledError.type,
+        userMessage: handledError.message,
+        silent: true
+      };
+
+      return Promise.reject(cleanError);
+    };
+
+    // Apply interceptors to remote API
+    if (apiInstance.remoteApi) {
+      // Clear any existing interceptors
+      apiInstance.remoteApi.interceptors.request.handlers = [];
+      apiInstance.remoteApi.interceptors.response.handlers = [];
       
-      throw error;
+      // Add new interceptors
+      apiInstance.remoteApi.interceptors.request.use(requestInterceptor, errorInterceptor);
+      apiInstance.remoteApi.interceptors.response.use(responseInterceptor, errorInterceptor);
+      console.log('Remote API interceptors set up');
+    }
+
+    // Apply interceptors to local API
+    if (apiInstance.localApi) {
+      // Clear any existing interceptors
+      apiInstance.localApi.interceptors.request.handlers = [];
+      apiInstance.localApi.interceptors.response.handlers = [];
+      
+      // Add new interceptors
+      apiInstance.localApi.interceptors.request.use(requestInterceptor, errorInterceptor);
+      apiInstance.localApi.interceptors.response.use(responseInterceptor, errorInterceptor);
+      console.log('Local API interceptors set up');
     }
   }
+// In api.js, modify the request method:
+async request(method, endpoint, data = null, options = {}) {
+  try {
+    await this.ensureInitialized();
+    
+    const isLocalEndpoint = endpoint.startsWith('/api/');
+    const api = isLocalEndpoint ? apiInstance.getLocalApi() : apiInstance.getRemoteApi();
+    
+    console.log('Using API:', isLocalEndpoint ? 'local' : 'remote');
+    console.log('Base URL:', api.defaults.baseURL);
+    
+    const config = {
+      method,
+      url: endpoint,
+      ...options,
+    };
+
+    if (data) {
+      if (method === 'get') {
+        config.params = data;
+      } else {
+        config.data = data;
+      }
+    }
+
+    const response = await api(config);
+    console.log('Response received:', response);
+    return response;
+  } catch (error) {
+    console.error('Request error:', error);
+    throw error;
+  }
+}
 
   // Convenience methods
-  get(endpoint, options) {
-    return this.request('GET', endpoint, null, options);
+  get(endpoint, params, options) {
+    return this.request('get', endpoint, params, options);
   }
 
   post(endpoint, data, options) {
-    return this.request('POST', endpoint, data, options);
+    return this.request('post', endpoint, data, options);
+  }
+
+  put(endpoint, data, options) {
+    return this.request('put', endpoint, data, options);
   }
 
   patch(endpoint, data, options) {
-    return this.request('PATCH', endpoint, data, options);
+    return this.request('patch', endpoint, data, options);
   }
 
   delete(endpoint, options) {
-    return this.request('DELETE', endpoint, null, options);
+    return this.request('delete', endpoint, null, options);
+  }
+
+  updateBaseUrl(newUrl) {
+    apiInstance.updateLocalBaseUrl(newUrl);
+  }
+
+  // Expose API instances for interceptor setup in AuthContext
+  get localApi() {
+    return apiInstance.localApi;
+  }
+
+  get remoteApi() {
+    return apiInstance.remoteApi;
   }
 }
 

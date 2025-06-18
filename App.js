@@ -28,11 +28,13 @@ import AppointmentScreen from './screens/AppointmentScreen';
 import RegistrationScreen from './screens/RegistrationScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import CarPairingScreen from './screens/CarPairingScreen';
+import PairingSyncScreen from './screens/PairingSyncScreen';
+import LogsScreen from './screens/LogsScreen';
 
 // Providers
 import { SensorDataProvider } from './contexts/SensorDataContext';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
-import LogsScreen from './screens/LogsScreen';
+import { NotificationStateProvider } from './contexts/NotificationStateContext';
 
 // Keep splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -76,11 +78,11 @@ const CustomTabBar = (props) => {
     }
     
     if (!isCarPaired) {
-      // Only show Home, Profile, and Appointment when not paired
-      return ['Home', 'Profile', 'Appointment'].includes(route.name);
+      // Only show Home, Profile, Appointment, and PairingSync when not paired
+      return ['Home', 'Profile', 'Appointment', 'PairingSync'].includes(route.name);
     } else {
-      // When paired, exclude Profile and Appointment
-      return !['Profile', 'Appointment'].includes(route.name);
+      // When paired, exclude Profile, Appointment, and PairingSync
+      return !['Profile', 'Appointment', 'PairingSync'].includes(route.name);
     }
   });
 
@@ -126,10 +128,10 @@ function MainTabs() {
       <Tab.Screen name="Home" component={withScreenErrorBoundary(HomeScreen, 'Home')} />
       <Tab.Screen name="Profile" component={withScreenErrorBoundary(ProfileScreen, 'Profile')} />
       <Tab.Screen name="Appointment" component={withScreenErrorBoundary(AppointmentScreen, 'Appointments')} />
+      <Tab.Screen name="PairingSync" component={withScreenErrorBoundary(PairingSyncScreen, 'Pairing Sync')} />
       <Tab.Screen name="Info" component={withScreenErrorBoundary(InfoScreen, 'Vehicle Info')} />
       <Tab.Screen name="LLM" component={withScreenErrorBoundary(LLMScreen, 'AI Assistant')} />
       <Tab.Screen name="Logs" component={withScreenErrorBoundary(LogsScreen, 'Logs')} />
-
       <Tab.Screen name="Notifications" component={withScreenErrorBoundary(NotificationScreen, 'Notifications')} />
       <Tab.Screen name="Settings" component={withScreenErrorBoundary(SettingsScreen, 'Settings')} />
     </Tab.Navigator>
@@ -212,6 +214,14 @@ function AppNavigator() {
                 presentation: 'modal',
               }}
             />
+            <Stack.Screen 
+              name="PairingSync" 
+              component={withScreenErrorBoundary(PairingSyncScreen, 'Pairing Sync')}
+              options={{
+                animation: 'slide_from_bottom',
+                presentation: 'modal',
+              }}
+            />
           </>
         )}
       </Stack.Navigator>
@@ -227,9 +237,11 @@ export default function App() {
           <NetworkErrorBoundary>
             <AuthProvider>
               <UserSettingsProvider>
-                <SensorDataProvider>
-                  <AppNavigator />
-                </SensorDataProvider>
+                <NotificationStateProvider>
+                  <SensorDataProvider>
+                    <AppNavigator />
+                  </SensorDataProvider>
+                </NotificationStateProvider>
               </UserSettingsProvider>
             </AuthProvider>
           </NetworkErrorBoundary>

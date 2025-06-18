@@ -4,7 +4,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   ScrollView,
   StatusBar,
   ActivityIndicator,
@@ -20,6 +19,8 @@ import { authApi } from '../services/authApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Config from '../config/config';
+import errorManager from '../services/errorManager';
+import axios from 'axios';
 
 const CarPairingScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -28,6 +29,8 @@ const CarPairingScreen = ({ navigation }) => {
   const [step, setStep] = useState('display'); // 'display' or 'edit'
   const [localIp, setLocalIp] = useState('');
   const [showIpInput, setShowIpInput] = useState(true);
+  const [ipError, setIpError] = useState('');
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [carData, setCarData] = useState({
     make: "Honda",
     model: "Accord",
@@ -50,7 +53,7 @@ const CarPairingScreen = ({ navigation }) => {
         setLocalIp(savedIp);
       }
     } catch (error) {
-      console.error('Error loading saved IP:', error);
+      errorManager.handleError(error, 'loadSavedIp');
     }
   };
 
@@ -63,37 +66,111 @@ const CarPairingScreen = ({ navigation }) => {
     return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
   };
 
+  // Test connection to the car's IP before proceeding
+// screens/CarPairingScreen.js - Update the testConnection function
+const testConnection = async (ip) => {
+  setIsTestingConnection(true);
+  setIpError('');
+  
+  try {
+    // Update config with the new IP
+    await Config.updateLocalIp(ip);
+    
+    // Create a temporary axios instance with very short timeout
+    const testApi = axios.create({
+      baseURL: `http://${ip}:3000`,
+      timeout: 2000, // 2 seconds timeout for testing
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    // Try a simple GET request
+    await testApi.get('/api/auth/pairing-token');
+    
+    // Connection successful
+    setIpError('');
+    
+    // Update the actual API service
+    const api = require('../services/api').default;
+    api.updateBaseUrl(`http://${ip}:3000`);
+    
+    return true;
+  } catch (error) {
+    // Don't use errorManager here to avoid any popups
+    console.log('Connection test failed:', error.message);
+    
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      setIpError('Connection timeout. Please check the IP address.');
+    } else if (error.code === 'ECONNREFUSED') {
+      setIpError('Connection refused. Make sure your car is on.');
+    } else {
+      setIpError('Cannot connect. Please verify the IP address.');
+    }
+    
+    return false;
+  } finally {
+    setIsTestingConnection(false);
+  }
+};
+
   const handlePairCar = async () => {
-    // Validate IP address
+    // Clear any previous errors
+    setIpError('');
+
+    // Validate IP address format
     if (!localIp || !validateIp(localIp)) {
-      Alert.alert('Invalid IP', 'Please enter a valid IP address (e.g., 192.168.1.5)');
+      setIpError('Please enter a valid IP address (e.g., 192.168.1.5)');
       return;
     }
 
     setLoading(true);
+    
     try {
-      // Save IP address and update config
-      await Config.updateLocalIp(localIp);
+      // Test connection first
+      const connectionValid = await testConnection(localIp);
       
-      // Update the API service with new IP
-      const api = require('../services/api').default;
-      api.updateBaseUrl(await Config.getLocalApiUrl());
+      if (!connectionValid) {
+        // Error message already set by testConnection
+        setLoading(false);
+        return;
+      }
+
+      // Save IP address
+      await AsyncStorage.setItem('localIpAddress', localIp);
       
       // Complete pairing flow
       const result = await authApi.completePairingFlow(carData);
       
-      // Set car as paired
-      await setCarPaired(true);
-      
-      // Navigate to the main app
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainTabs' }],
-      });
+      if (result.success) {
+        // Set car as paired
+        await setCarPaired(true);
+        
+        // Navigate to the main app
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainTabs' }],
+        });
+      } else {
+        throw new Error('Pairing failed');
+      }
       
     } catch (error) {
-      console.error('Pairing failed:', error);
-      Alert.alert('Error', `Pairing failed: ${error.message}`);
+      const handledError = errorManager.handleError(error, 'handlePairCar');
+      
+      // Show specific error messages based on error type
+      if (handledError.type === 'network') {
+        setIpError('Network error. Please check your connection and try again.');
+      } else if (handledError.type === 'auth') {
+        setIpError('Authentication failed. Please login again.');
+        // Navigate back to login if auth fails
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      } else {
+        setIpError('Pairing failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -110,7 +187,10 @@ const CarPairingScreen = ({ navigation }) => {
   const CommonIpButton = ({ ip }) => (
     <TouchableOpacity
       style={tw`bg-gray-700 px-3 py-2 rounded-lg mr-2 mb-2`}
-      onPress={() => setLocalIp(ip)}
+      onPress={() => {
+        setLocalIp(ip);
+        setIpError('');
+      }}
     >
       <Text style={tw`text-gray-300 text-sm`}>{ip}</Text>
     </TouchableOpacity>
@@ -136,24 +216,37 @@ const CarPairingScreen = ({ navigation }) => {
             <Text style={tw`text-gray-400 text-sm mb-2`}>
               Enter your car's local IP address
             </Text>
-            <View style={tw`bg-gray-700 rounded-xl px-4 py-3 flex-row items-center`}>
+            <View style={tw`bg-gray-700 rounded-xl px-4 py-3 flex-row items-center ${ipError ? 'border border-red-500' : ''}`}>
               <MaterialCommunityIcons name="ip-network" size={20} color="#60A5FA" style={tw`mr-3`} />
               <TextInput
                 style={tw`flex-1 text-white`}
                 value={localIp}
-                onChangeText={setLocalIp}
+                onChangeText={(text) => {
+                  setLocalIp(text);
+                  setIpError('');
+                }}
                 placeholder="192.168.1.5"
                 placeholderTextColor="#6B7280"
                 keyboardType="numeric"
                 autoCapitalize="none"
               />
-              {localIp && validateIp(localIp) && (
+              {localIp && validateIp(localIp) && !ipError && (
                 <MaterialCommunityIcons name="check-circle" size={20} color="#10B981" />
+              )}
+              {isTestingConnection && (
+                <ActivityIndicator size="small" color="#60A5FA" />
               )}
             </View>
             
+            {/* Error Message */}
+            {ipError && (
+              <View style={tw`mt-2 bg-red-900/20 rounded-lg p-3`}>
+                <Text style={tw`text-red-400 text-sm`}>{ipError}</Text>
+              </View>
+            )}
+            
             {/* IP Format Helper */}
-            {localIp && !validateIp(localIp) && (
+            {localIp && !validateIp(localIp) && !ipError && (
               <Text style={tw`text-red-400 text-xs mt-2`}>
                 Please enter a valid IP address format
               </Text>
@@ -169,6 +262,29 @@ const CarPairingScreen = ({ navigation }) => {
                 <CommonIpButton ip="172.16.0.5" />
               </View>
             </View>
+            
+
+            
+            {/* Test Connection Button */}
+            {localIp && validateIp(localIp) && (
+              <TouchableOpacity
+                style={tw`bg-gray-700 rounded-lg px-4 py-2 mt-3 flex-row items-center justify-center`}
+                onPress={() => testConnection(localIp)}
+                disabled={isTestingConnection}
+              >
+                {isTestingConnection ? (
+                  <>
+                    <ActivityIndicator size="small" color="#60A5FA" />
+                    <Text style={tw`text-blue-400 text-sm ml-2`}>Testing...</Text>
+                  </>
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="connection" size={16} color="#60A5FA" />
+                    <Text style={tw`text-blue-400 text-sm ml-2`}>Test Connection</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
             
             {/* Instructions */}
             <View style={tw`bg-blue-900/20 rounded-lg p-3 mt-4`}>
@@ -211,9 +327,9 @@ const CarPairingScreen = ({ navigation }) => {
       </View>
 
       <TouchableOpacity
-        style={tw`bg-blue-600 rounded-2xl py-4 px-6 shadow-lg ${(!localIp || loading) ? 'opacity-60' : ''}`}
+        style={tw`bg-blue-600 rounded-2xl py-4 px-6 shadow-lg ${(!localIp || loading || ipError) ? 'opacity-60' : ''}`}
         onPress={handlePairCar}
-        disabled={loading || !localIp}
+        disabled={loading || !localIp || !!ipError}
       >
         {loading ? (
           <ActivityIndicator color="white" />
@@ -226,6 +342,7 @@ const CarPairingScreen = ({ navigation }) => {
           </View>
         )}
       </TouchableOpacity>
+      
       {/* Additional Info */}
       <View style={tw`mt-4 mb-8`}>
         <Text style={tw`text-gray-500 text-xs text-center`}>

@@ -49,20 +49,36 @@ export default function HomeScreen({ navigation }) {
   const fetchSensorData = async () => {
     try {
       const response = await api.get('/api/obd/live');
-      if (response) {
+
+      if (response && typeof response === 'object') {
         setSensorData(response);
         processDataPoint(response, dataPoints.current, appStartTime.current);
+
         const healthResult = calculateCarHealth(response);
         setCarHealth(healthResult.health);
         setHealthFactors(healthResult.factors);
+      } else {
+        console.warn('Invalid sensor response format:', response);
       }
     } catch (error) {
-      console.error('Error fetching sensor data:', error);
+      console.error('Error fetching sensor data:', error.message);
+
+      // Optional: Silent handling of specific expected errors
+      if (error.response?.status === 404 || error.response?.status === 401) {
+        return;
+      }
+
+      // You can choose to suppress all errors silently for UX
+      // return;
+
+      // Or keep throwing for logging tools
+      // throw error;
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
 
   const onRefresh = () => {
     setRefreshing(true);
