@@ -50,12 +50,15 @@ export const useChatHistory = () => {
   const loadChatHistory = async () => {
     setIsLoading(true);
     try {
-      const chats = await chatApi.getAllChats();
+      const response = await chatApi.getAllChats();
       
-      console.log('Raw chats from API:', chats);
+      console.log('Raw chats from API:', response);
+      
+      // Ensure we have an array
+      const chatsArray = Array.isArray(response) ? response : [];
       
       // Transform the data to ensure proper formatting
-      const formattedChats = chats.map(chat => {
+      const formattedChats = chatsArray.map(chat => {
         // Use lastMessageDate if available, otherwise use startedAt
         const dateToUse = chat.lastMessageDate || chat.startedAt;
         

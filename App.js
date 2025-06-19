@@ -1,5 +1,5 @@
 // App.js
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -35,6 +35,10 @@ import LogsScreen from './screens/LogsScreen';
 import { SensorDataProvider } from './contexts/SensorDataContext';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
 import { NotificationStateProvider } from './contexts/NotificationStateContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+
+// Services
+import apiInstance from './services/apiInstance';
 
 // Keep splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -46,6 +50,7 @@ const Tab = createBottomTabNavigator();
 LogBox.ignoreLogs([
   'Non-serializable values were found in the navigation state',
   'VirtualizedLists should never be nested',
+  'Cannot update a component', // Add this to ignore state update warnings during initialization
 ]);
 
 // HOC to wrap screens with error boundary
@@ -143,7 +148,10 @@ function AppNavigator() {
 
   useEffect(() => {
     if (!loading) {
-      SplashScreen.hideAsync();
+      // Add a small delay to ensure smooth transition
+      setTimeout(() => {
+        SplashScreen.hideAsync();
+      }, 100);
     }
   }, [loading]);
 
@@ -229,21 +237,58 @@ function AppNavigator() {
   );
 }
 
+// App initialization component to handle API setup
+function AppWithInitialization() {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        // Initialize API instances before anything else
+        await apiInstance.initialize();
+        console.log('API instances initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize API instances:', error);
+        // Still proceed even if initialization fails
+      } finally {
+        setIsInitialized(true);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
+  if (!isInitialized) {
+    return (
+      <View style={tw`flex-1 justify-center items-center bg-gray-900`}>
+        <LoadingCarIcon size={60} />
+        <Text style={tw`mt-4 text-gray-400 text-lg`}>Starting up...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <AuthProvider>
+      <UserSettingsProvider>
+        <SensorDataProvider>
+          <NotificationProvider>
+            <NotificationStateProvider>
+              <AppNavigator />
+            </NotificationStateProvider>
+          </NotificationProvider>
+        </SensorDataProvider>
+      </UserSettingsProvider>
+    </AuthProvider>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={tw`flex-1`}>
         <NetworkProvider>
           <NetworkErrorBoundary>
-            <AuthProvider>
-              <UserSettingsProvider>
-                <NotificationStateProvider>
-                  <SensorDataProvider>
-                    <AppNavigator />
-                  </SensorDataProvider>
-                </NotificationStateProvider>
-              </UserSettingsProvider>
-            </AuthProvider>
+            <AppWithInitialization />
           </NetworkErrorBoundary>
         </NetworkProvider>
       </GestureHandlerRootView>

@@ -3,6 +3,7 @@ import React, { createContext, useState, useContext, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiInstance from '../services/apiInstance';
 import { authApi } from '../services/authApi';
+import { STORAGE_KEYS } from '../Constants/storageKey';
 import errorManager from '../services/errorManager';
 
 const AuthContext = createContext({});
@@ -22,7 +23,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isCarPaired, setIsCarPaired] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+  const SYNC_DATA_KEY = '@vehicle_sync_data';
+  const LAST_SYNC_KEY = '@last_sync_timestamp';
+  const SENSOR_READINGS_KEY = '@sensor_readings_data';
+  const DIAGNOSTICS_KEY = '@diagnostics_data';
+  const EVENTS_KEY = '@events_data';
   // Refs to track refresh status
   const localTokenRefreshPromise = useRef(null);
 
@@ -202,19 +207,26 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [isCarPaired, localToken]);
 
-  const loadAuthData = async () => {
-    try {
-      const savedRemoteToken = await AsyncStorage.getItem('authToken');
-      const savedLocalToken = await AsyncStorage.getItem('localAuthToken');
-      const carPairingStatus = await AsyncStorage.getItem('isCarPaired');
-      // Defensive: wipe any stale data if both tokens are missing
-      if (!savedRemoteToken && !savedLocalToken) {
+const loadAuthData = async () => {
+  try {
+    const savedRemoteToken = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    const savedLocalToken = await AsyncStorage.getItem(STORAGE_KEYS.LOCAL_AUTH_TOKEN);
+    const carPairingStatus = await AsyncStorage.getItem(STORAGE_KEYS.IS_CAR_PAIRED);
+    
+    if (!savedRemoteToken && !savedLocalToken) {
         console.log('No tokens — clearing sync data to be safe');
-        await syncService.clearSyncData?.();
-
-        setTimeout(() => {
-          setSyncData?.(null);
-        }, 0);
+        try {
+          // Clear sync data directly
+          await AsyncStorage.multiRemove([
+            STORAGE_KEYS.SYNC_DATA_KEY,
+            STORAGE_KEYS.LAST_SYNC_KEY,
+            STORAGE_KEYS.SENSOR_READINGS_KEY,
+            STORAGE_KEYS.DIAGNOSTICS_KEY,
+            STORAGE_KEYS.EVENTS_KEY
+          ]);
+        } catch (error) {
+          console.log('Error clearing sync data:', error);
+        }
       }
 
       if (savedRemoteToken && !isTokenExpired(savedRemoteToken)) {
@@ -440,37 +452,26 @@ const saveToken = async (newToken) => {
     };
   }, [localToken, isCarPaired, apiInstance.initialized]);
 
-  const value = {
-    // Backward compatibility
-    token: remoteToken,
-    
-    // New token management
-    remoteToken,
-    localToken,
-    
-    // User info
-    userInfo,
-    loading,
-    isRefreshing,
-    
-    // Authentication states
-    isAuthenticated: !!remoteToken && !isTokenExpired(remoteToken),
-    isCarPaired,
-    
-    // Token utilities
-    isTokenExpired,
-    
-    // Actions
-    saveToken,
-    saveLocalToken,
-    setCarPaired,
-    logout: clearToken,
-    clearLocalToken,
-    refreshUserProfile: fetchUserProfile,
-    refreshLocalToken: refreshLocalTokenIfNeeded,
-    checkPairingStatus,
-    completePairing
-  };
+const value = {
+  token: remoteToken,
+  remoteToken,
+  localToken,
+  userInfo,
+  loading,
+  isRefreshing,
+  isAuthenticated: !!remoteToken && !isTokenExpired(remoteToken),
+  isCarPaired, 
+  isTokenExpired,
+  saveToken,
+  saveLocalToken,
+  setCarPaired,
+  logout: clearToken,
+  clearLocalToken,
+  refreshUserProfile: fetchUserProfile,
+  refreshLocalToken: refreshLocalTokenIfNeeded,
+  checkPairingStatus,
+  completePairing
+};
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

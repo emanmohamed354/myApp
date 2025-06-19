@@ -31,7 +31,7 @@ const LoginForm = ({ navigation }) => {
     ]).start();
   };
 
-  const handleLogin = async () => {
+const handleLogin = async () => {
     Keyboard.dismiss();
     
     if (!username.trim() || !password) {
@@ -48,18 +48,12 @@ const LoginForm = ({ navigation }) => {
 
       if (loginResponse.accessToken) {
         await saveToken(loginResponse.accessToken);
+        // Navigation will happen automatically via AuthContext
       }
     } catch (error) {
       shake();
-      let errorMessage = 'Invalid username or password';
-      
-      if (error.response?.status === 429) {
-        errorMessage = 'Too many attempts. Please try again later.';
-      } else if (!error.response) {
-        errorMessage = 'Connection error. Please check your internet.';
-      }
-      
-      Alert.alert('Login Failed', errorMessage);
+      // Silently handle the error - no alert
+      console.log('Login error:', error.message);
     } finally {
       setLoading(false);
     }

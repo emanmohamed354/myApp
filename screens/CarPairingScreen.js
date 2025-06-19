@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   TextInput,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Alert,
+  Modal
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +22,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Config from '../config/config';
 import errorManager from '../services/errorManager';
+import QrScanner from '../components/QrScanner';
 import axios from 'axios';
 
 const CarPairingScreen = ({ navigation }) => {
@@ -41,6 +44,96 @@ const CarPairingScreen = ({ navigation }) => {
     transmission: "CVT",
     fuelType: "Gasoline"
   });
+  const [showScanner, setShowScanner] = useState(false);
+
+  const handleQrScan = async (data) => {
+    setShowScanner(false);
+    try {
+      const qrData = JSON.parse(data);
+      if (qrData.ip && validateIp(qrData.ip)) {
+        setLocalIp(qrData.ip);
+        Alert.alert(
+          'QR Code Scanned',
+          `Successfully scanned IP: ${qrData.ip}\n\nWould you like to pair now?`,
+          [
+            { text: 'Cancel' },
+            { 
+              text: 'Pair Now', 
+              onPress: async () => {
+                setLoading(true);
+                const connectionValid = await testConnection(qrData.ip);
+                if (connectionValid) {
+                  await handlePairCar();
+                }
+              }
+            }
+          ]
+        );
+        
+        // If WiFi info exists, prompt to connect
+        if (qrData.ssid) {
+          promptWifiConnection(qrData.ssid, qrData.password);
+        }
+        
+        // Automatically test connection and pair
+        const connectionValid = await testConnection(qrData.ip);
+        if (connectionValid) {
+          await AsyncStorage.setItem('localIpAddress', qrData.ip);
+          await handlePairCar(); // This will trigger the full pairing flow
+        }
+        
+      } else {
+        Alert.alert('Invalid QR Code', 'The scanned QR code does not contain a valid IP address.');
+      }
+    } catch (error) {
+      console.error('QR Scan Error:', error);
+      Alert.alert('Error', 'Failed to process QR code data.');
+    }
+  };
+
+  const promptWifiConnection = (ssid, password) => {
+    Alert.alert(
+      'Connect to Car WiFi',
+      `Your car's WiFi network is ${ssid}. Please connect to it in your device settings.`,
+      [
+        { text: 'Cancel' },
+        { text: 'Open WiFi Settings', onPress: () => openWifiSettings() }
+      ]
+    );
+  };
+
+  const openWifiSettings = () => {
+    Alert.alert('Info', 'Please manually connect to the WiFi in your device settings.');
+  };
+
+  const renderScannerOption = () => (
+    <View style={tw`bg-gray-800 rounded-2xl p-6 mb-4`}>
+      <Text style={tw`text-white text-xl font-bold mb-4`}>QR Code Pairing</Text>
+      
+      <TouchableOpacity
+        style={tw`bg-blue-600 rounded-lg py-4 flex-row items-center justify-center`}
+        onPress={() => setShowScanner(true)}
+      >
+        <MaterialCommunityIcons name="qrcode-scan" size={24} color="white" />
+        <Text style={tw`text-white text-lg ml-2`}>Scan QR Code</Text>
+      </TouchableOpacity>
+
+      <View style={tw`bg-blue-900/20 rounded-lg p-3 mt-4`}>
+        <View style={tw`flex-row items-start`}>
+          <MaterialCommunityIcons name="information" size={16} color="#60A5FA" style={tw`mt-0.5 mr-2`} />
+          <View style={tw`flex-1`}>
+            <Text style={tw`text-blue-400 text-xs font-semibold mb-1`}>How to pair with QR:</Text>
+            <Text style={tw`text-gray-500 text-xs leading-5`}>
+              1. Go to your car's dashboard{'\n'}
+              2. Select "Pair Device"{'\n'}
+              3. Choose "Generate QR Code"{'\n'}
+              4. Scan the displayed QR code
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
 
   useEffect(() => {
     loadSavedIp();
@@ -66,59 +159,49 @@ const CarPairingScreen = ({ navigation }) => {
     return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
   };
 
-  // Test connection to the car's IP before proceeding
-// screens/CarPairingScreen.js - Update the testConnection function
-const testConnection = async (ip) => {
-  setIsTestingConnection(true);
-  setIpError('');
-  
-  try {
-    // Update config with the new IP
-    await Config.updateLocalIp(ip);
-    
-    // Create a temporary axios instance with very short timeout
-    const testApi = axios.create({
-      baseURL: `http://${ip}:3000`,
-      timeout: 2000, // 2 seconds timeout for testing
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    // Try a simple GET request
-    await testApi.get('/api/auth/pairing-token');
-    
-    // Connection successful
+  const testConnection = async (ip) => {
+    setIsTestingConnection(true);
     setIpError('');
     
-    // Update the actual API service
-    const api = require('../services/api').default;
-    api.updateBaseUrl(`http://${ip}:3000`);
-    
-    return true;
-  } catch (error) {
-    // Don't use errorManager here to avoid any popups
-    console.log('Connection test failed:', error.message);
-    
-    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      setIpError('Connection timeout. Please check the IP address.');
-    } else if (error.code === 'ECONNREFUSED') {
-      setIpError('Connection refused. Make sure your car is on.');
-    } else {
-      setIpError('Cannot connect. Please verify the IP address.');
+    try {
+      await Config.updateLocalIp(ip);
+      
+      const testApi = axios.create({
+        baseURL: `http://${ip}:3000`,
+        timeout: 2000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      await testApi.get('/api/auth/pairing-token');
+      
+      setIpError('');
+      
+      const api = require('../services/api').default;
+      api.updateBaseUrl(`http://${ip}:3000`);
+      
+      return true;
+    } catch (error) {
+      console.log('Connection test failed:', error.message);
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        setIpError('Connection timeout. Please check the IP address.');
+      } else if (error.code === 'ECONNREFUSED') {
+        setIpError('Connection refused. Make sure your car is on.');
+      } else {
+        setIpError('Cannot connect. Please verify the IP address.');
+      }
+      
+      return false;
+    } finally {
+      setIsTestingConnection(false);
     }
-    
-    return false;
-  } finally {
-    setIsTestingConnection(false);
-  }
-};
+  };
 
   const handlePairCar = async () => {
-    // Clear any previous errors
     setIpError('');
 
-    // Validate IP address format
     if (!localIp || !validateIp(localIp)) {
       setIpError('Please enter a valid IP address (e.g., 192.168.1.5)');
       return;
@@ -127,26 +210,20 @@ const testConnection = async (ip) => {
     setLoading(true);
     
     try {
-      // Test connection first
       const connectionValid = await testConnection(localIp);
       
       if (!connectionValid) {
-        // Error message already set by testConnection
         setLoading(false);
         return;
       }
 
-      // Save IP address
       await AsyncStorage.setItem('localIpAddress', localIp);
       
-      // Complete pairing flow
       const result = await authApi.completePairingFlow(carData);
       
       if (result.success) {
-        // Set car as paired
         await setCarPaired(true);
         
-        // Navigate to the main app
         navigation.reset({
           index: 0,
           routes: [{ name: 'MainTabs' }],
@@ -158,12 +235,10 @@ const testConnection = async (ip) => {
     } catch (error) {
       const handledError = errorManager.handleError(error, 'handlePairCar');
       
-      // Show specific error messages based on error type
       if (handledError.type === 'network') {
         setIpError('Network error. Please check your connection and try again.');
       } else if (handledError.type === 'auth') {
         setIpError('Authentication failed. Please login again.');
-        // Navigate back to login if auth fails
         navigation.reset({
           index: 0,
           routes: [{ name: 'Login' }],
@@ -198,7 +273,8 @@ const testConnection = async (ip) => {
 
   const renderDisplayView = () => (
     <>
-      {/* IP Address Input Section */}
+      {renderScannerOption()}
+
       <View style={tw`bg-gray-800 rounded-2xl p-6 mb-4`}>
         <View style={tw`flex-row justify-between items-center mb-4`}>
           <Text style={tw`text-white text-xl font-bold`}>Local Connection</Text>
@@ -238,21 +314,18 @@ const testConnection = async (ip) => {
               )}
             </View>
             
-            {/* Error Message */}
             {ipError && (
               <View style={tw`mt-2 bg-red-900/20 rounded-lg p-3`}>
                 <Text style={tw`text-red-400 text-sm`}>{ipError}</Text>
               </View>
             )}
             
-            {/* IP Format Helper */}
             {localIp && !validateIp(localIp) && !ipError && (
               <Text style={tw`text-red-400 text-xs mt-2`}>
                 Please enter a valid IP address format
               </Text>
             )}
             
-            {/* Common IPs */}
             <View style={tw`mt-4`}>
               <Text style={tw`text-gray-500 text-xs mb-2`}>Common local IPs:</Text>
               <View style={tw`flex-row flex-wrap`}>
@@ -263,9 +336,6 @@ const testConnection = async (ip) => {
               </View>
             </View>
             
-
-            
-            {/* Test Connection Button */}
             {localIp && validateIp(localIp) && (
               <TouchableOpacity
                 style={tw`bg-gray-700 rounded-lg px-4 py-2 mt-3 flex-row items-center justify-center`}
@@ -286,7 +356,6 @@ const testConnection = async (ip) => {
               </TouchableOpacity>
             )}
             
-            {/* Instructions */}
             <View style={tw`bg-blue-900/20 rounded-lg p-3 mt-4`}>
               <View style={tw`flex-row items-start`}>
                 <MaterialCommunityIcons name="information" size={16} color="#60A5FA" style={tw`mt-0.5 mr-2`} />
@@ -305,7 +374,6 @@ const testConnection = async (ip) => {
         )}
       </View>
 
-      {/* Vehicle Details */}
       <View style={tw`bg-gray-800 rounded-2xl p-6 mb-6`}>
         <View style={tw`flex-row justify-between items-center mb-4`}>
           <Text style={tw`text-white text-xl font-bold`}>Vehicle Details</Text>
@@ -343,7 +411,6 @@ const testConnection = async (ip) => {
         )}
       </TouchableOpacity>
       
-      {/* Additional Info */}
       <View style={tw`mt-4 mb-8`}>
         <Text style={tw`text-gray-500 text-xs text-center`}>
           Make sure your phone and car are on the same network
@@ -394,7 +461,6 @@ const testConnection = async (ip) => {
     >
       <StatusBar barStyle="light-content" />
       
-      {/* Header */}
       <LinearGradient
         colors={['rgba(59, 130, 246, 0.3)', 'rgba(59, 130, 246, 0.1)']}
         style={{ paddingTop: insets.top }}
@@ -410,21 +476,29 @@ const testConnection = async (ip) => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Icon */}
         <View style={tw`items-center mb-8`}>
           <View style={tw`bg-blue-600/20 rounded-full p-6`}>
             <MaterialCommunityIcons name="car-connected" size={80} color="#60A5FA" />
           </View>
         </View>
 
-        {/* Content */}
         {step === 'display' ? renderDisplayView() : renderEditView()}
+
+        <Modal
+          visible={showScanner}
+          animationType="slide"
+          onRequestClose={() => setShowScanner(false)}
+        >
+          <QrScanner 
+            onScan={handleQrScan} 
+            onClose={() => setShowScanner(false)} 
+          />
+        </Modal>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
-// Helper Components
 const InfoRow = ({ label, value }) => (
   <View style={tw`flex-row justify-between py-2`}>
     <Text style={tw`text-gray-400`}>{label}</Text>

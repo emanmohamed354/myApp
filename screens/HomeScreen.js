@@ -28,19 +28,38 @@ export default function HomeScreen({ navigation }) {
   } = useSensorData();
   
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const { isAuthenticated, isCarPaired } = useAuth();
   const scrollViewRef = useRef();
+  const fetchIntervalRef = useRef(null);
   
   useEffect(() => {
-    if (!sensorData || Object.keys(sensorData).length === 0) {
+    // Initialize on first load
+    if (!hasInitialized) {
+      setHasInitialized(true);
       setLoading(true);
     }
     
+    // Clear any existing interval
+    if (fetchIntervalRef.current) {
+      clearInterval(fetchIntervalRef.current);
+      fetchIntervalRef.current = null;
+    }
+    
     if (isAuthenticated && isCarPaired) {
+      // Initial fetch
       fetchSensorData();
-      const interval = setInterval(fetchSensorData, 2000);
-      return () => clearInterval(interval);
+      
+      // Set up interval
+      fetchIntervalRef.current = setInterval(fetchSensorData, 2000);
+      
+      return () => {
+        if (fetchIntervalRef.current) {
+          clearInterval(fetchIntervalRef.current);
+          fetchIntervalRef.current = null;
+        }
+      };
     } else {
       setLoading(false);
     }
@@ -50,42 +69,45 @@ export default function HomeScreen({ navigation }) {
     try {
       const response = await api.get('/api/obd/live');
 
+      // Validate response
       if (response && typeof response === 'object') {
+        // Update sensor data
         setSensorData(response);
-        processDataPoint(response, dataPoints.current, appStartTime.current);
+        
+        // Process data point for charts
+        if (dataPoints.current && appStartTime.current) {
+          processDataPoint(response, dataPoints.current, appStartTime.current);
+        }
 
+        // Calculate health
         const healthResult = calculateCarHealth(response);
-        setCarHealth(healthResult.health);
-        setHealthFactors(healthResult.factors);
+        if (healthResult) {
+          setCarHealth(healthResult.health || 0);
+          setHealthFactors(healthResult.factors || {});
+        }
       } else {
         console.warn('Invalid sensor response format:', response);
       }
     } catch (error) {
       console.error('Error fetching sensor data:', error.message);
-
-      // Optional: Silent handling of specific expected errors
-      if (error.response?.status === 404 || error.response?.status === 401) {
-        return;
-      }
-
-      // You can choose to suppress all errors silently for UX
-      // return;
-
-      // Or keep throwing for logging tools
-      // throw error;
+      
+      // Don't set empty data on error - keep last known good data
+      // Only log the error, don't disrupt the UI
     } finally {
-      setLoading(false);
+      // Only set loading to false on first load
+      if (loading) {
+        setLoading(false);
+      }
       setRefreshing(false);
     }
   };
-
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchSensorData();
   };
 
-  if (loading) {
+  if (loading && !hasInitialized) {
     return (
       <View style={tw`flex-1 bg-gray-900 justify-center items-center`}>
         <ActivityIndicator size="large" color="#3B82F6" />
@@ -137,6 +159,7 @@ export default function HomeScreen({ navigation }) {
     );
   }
 
+  // Get chart data
   const chartData = getChartData(dataPoints.current, appStartTime.current);
 
   return (
@@ -157,13 +180,13 @@ export default function HomeScreen({ navigation }) {
           />
         }
       >
-        <CriticalSensorsSection sensorData={sensorData} />
-        <SecondarySensorsSection sensorData={sensorData} />
+        <CriticalSensorsSection sensorData={sensorData || {}} />
+        <SecondarySensorsSection sensorData={sensorData || {}} />
         <VehicleHealthSection 
-          carHealth={carHealth} 
-          healthFactors={healthFactors} 
+          carHealth={carHealth || 0} 
+          healthFactors={healthFactors || {}} 
         />
-        <PerformanceCharts chartData={chartData} />
+        <PerformanceCharts chartData={chartData || { labels: [], rpm: [], speed: [], temp: [] }} />
       </ScrollView>
     </View>
   );

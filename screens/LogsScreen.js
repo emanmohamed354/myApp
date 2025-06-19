@@ -192,19 +192,25 @@ export default function LogsScreen({ navigation }) {
     setError(null);
 
     try {
-      const [diagnostic, events] = await Promise.all([
+      const [diagnosticResponse, eventsResponse] = await Promise.all([
         logsApi.getDiagnosticLogs(),
         logsApi.getEventLogs()
       ]);
       
-      setDiagnosticLogs(diagnostic || []);
-      setEventLogs(events || []);
+      // Ensure we're working with arrays
+      const diagnosticData = Array.isArray(diagnosticResponse) ? diagnosticResponse : [];
+      const eventsData = Array.isArray(eventsResponse) ? eventsResponse : [];
+      
+      setDiagnosticLogs(diagnosticData);
+      setEventLogs(eventsData);
       
       // Animate items in
-      animateItems(activeTab === 'diagnostic' ? diagnostic : activeTab === 'events' ? events : syncData);
+      animateItems(activeTab === 'diagnostic' ? diagnosticData : activeTab === 'events' ? eventsData : []);
     } catch (err) {
       console.error('Error loading logs:', err);
       setError('Failed to load logs');
+      setDiagnosticLogs([]);
+      setEventLogs([]);
     } finally {
       setIsLoading(false);
     }
@@ -253,7 +259,7 @@ export default function LogsScreen({ navigation }) {
   }
 
   const renderContent = () => {
-    if (isLoading && diagnosticLogs.length === 0 && eventLogs.length === 0 && (!syncData.diagnostics || syncData.diagnostics.length === 0)) {
+    if (isLoading && diagnosticLogs.length === 0 && eventLogs.length === 0) {
       return <LoadingState activeTab={activeTab} />;
     }
 
@@ -263,12 +269,13 @@ export default function LogsScreen({ navigation }) {
 
     switch (activeTab) {
       case 'diagnostic':
-        if (diagnosticLogs.length === 0) {
+        const safeDiagnosticLogs = Array.isArray(diagnosticLogs) ? diagnosticLogs : [];
+        if (safeDiagnosticLogs.length === 0) {
           return <EmptyState type="diagnostic" />;
         }
         return (
           <>
-            {diagnosticLogs.map((log, index) => (
+            {safeDiagnosticLogs.map((log, index) => (
               <DiagnosticLog
                 key={log.id}
                 log={log}
@@ -278,18 +285,19 @@ export default function LogsScreen({ navigation }) {
                 onClearCode={handleClearCode}
               />
             ))}
-            <DiagnosticSummary diagnosticLogs={diagnosticLogs} />
+            <DiagnosticSummary diagnosticLogs={safeDiagnosticLogs} />
           </>
         );
 
       case 'events':
-        if (eventLogs.length === 0) {
+        const safeEventLogs = Array.isArray(eventLogs) ? eventLogs : [];
+        if (safeEventLogs.length === 0) {
           return <EmptyState type="events" />;
         }
         return (
           <>
-            <EventSummary eventLogs={eventLogs} />
-            {eventLogs.map((log, index) => (
+            <EventSummary eventLogs={safeEventLogs} />
+            {safeEventLogs.map((log, index) => (
               <EventLog
                 key={log.id}
                 log={log}

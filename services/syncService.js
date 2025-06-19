@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
 import { useAuth } from '../contexts/AuthContext';
+import { STORAGE_KEYS } from '../Constants/storageKey';
 
 const SYNC_DATA_KEY = '@vehicle_sync_data';
 const LAST_SYNC_KEY = '@last_sync_timestamp';
@@ -11,14 +12,12 @@ const EVENTS_KEY = '@events_data';
 
 export const syncService = {
   // Get sync data from local API (when paired)
-  getLocalSyncDataFromAPI: async () => {
+ getLocalSyncDataFromAPI: async () => {
     try {
-      // GET request to local API
       const response = await api.get('/api/sync');
       console.log('Local sync GET response:', response);
       
       if (response) {
-        // Save the data locally for later use
         await syncService.saveLocalSyncData(response);
         return response;
       }

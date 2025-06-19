@@ -24,7 +24,6 @@ class ApiService {
     // Request interceptor
     const requestInterceptor = async (config) => {
       try {
-        // Determine which API is being used
         const isRemoteApi = config.baseURL === apiInstance.remoteApi?.defaults.baseURL;
         const isLocalApi = config.baseURL === apiInstance.localApi?.defaults.baseURL;
 
@@ -48,20 +47,18 @@ class ApiService {
       return config;
     };
 
-    // Response interceptor
+    // Response interceptor - FIXED to properly return data
     const responseInterceptor = (response) => {
-      // Return just the data
-      return response.data;
+      // Return just the data, not the full response
+      return response.data || response;
     };
 
     // Error interceptor
     const errorInterceptor = (error) => {
       console.log('API Error interceptor:', error.response?.status, error.config?.url);
       
-      // Handle errors silently
       const handledError = errorManager.handleError(error, 'API');
       
-      // Create a clean error object
       const cleanError = {
         ...error,
         handled: true,
@@ -73,63 +70,74 @@ class ApiService {
       return Promise.reject(cleanError);
     };
 
-    // Apply interceptors to remote API
-    if (apiInstance.remoteApi) {
-      // Clear any existing interceptors
-      apiInstance.remoteApi.interceptors.request.handlers = [];
-      apiInstance.remoteApi.interceptors.response.handlers = [];
-      
-      // Add new interceptors
-      apiInstance.remoteApi.interceptors.request.use(requestInterceptor, errorInterceptor);
-      apiInstance.remoteApi.interceptors.response.use(responseInterceptor, errorInterceptor);
-      console.log('Remote API interceptors set up');
-    }
-
-    // Apply interceptors to local API
-    if (apiInstance.localApi) {
-      // Clear any existing interceptors
-      apiInstance.localApi.interceptors.request.handlers = [];
-      apiInstance.localApi.interceptors.response.handlers = [];
-      
-      // Add new interceptors
-      apiInstance.localApi.interceptors.request.use(requestInterceptor, errorInterceptor);
-      apiInstance.localApi.interceptors.response.use(responseInterceptor, errorInterceptor);
-      console.log('Local API interceptors set up');
-    }
-  }
-// In api.js, modify the request method:
-async request(method, endpoint, data = null, options = {}) {
-  try {
-    await this.ensureInitialized();
-    
-    const isLocalEndpoint = endpoint.startsWith('/api/');
-    const api = isLocalEndpoint ? apiInstance.getLocalApi() : apiInstance.getRemoteApi();
-    
-    console.log('Using API:', isLocalEndpoint ? 'local' : 'remote');
-    console.log('Base URL:', api.defaults.baseURL);
-    
-    const config = {
-      method,
-      url: endpoint,
-      ...options,
-    };
-
-    if (data) {
-      if (method === 'get') {
-        config.params = data;
-      } else {
-        config.data = data;
+    // Apply interceptors to both APIs
+    [apiInstance.remoteApi, apiInstance.localApi].forEach(api => {
+      if (api) {
+        api.interceptors.request.use(requestInterceptor, errorInterceptor);
+        api.interceptors.response.use(responseInterceptor, errorInterceptor);
       }
-    }
-
-    const response = await api(config);
-    console.log('Response received:', response);
-    return response;
-  } catch (error) {
-    console.error('Request error:', error);
-    throw error;
+    });
   }
-}
+
+  async request(method, endpoint, data = null, options = {}) {
+    try {
+      await this.ensureInitialized();
+      
+      const isLocalEndpoint = endpoint.startsWith('/api/');
+      
+      // Check if we should skip the request
+      if (isLocalEndpoint) {
+        const localToken = await AsyncStorage.getItem('localAuthToken');
+        const isCarPaired = await AsyncStorage.getItem('isCarPaired');
+        
+        // Skip certain endpoints if not paired
+        if (!localToken || isCarPaired !== 'true') {
+          const protectedEndpoints = [
+            '/api/notifications',
+            '/api/obd/live',
+            '/api/obd/profile',
+            '/api/sync',
+            '/api/llm'
+          ];
+          
+          if (protectedEndpoints.some(ep => endpoint.startsWith(ep))) {
+            console.log(`Skipping ${endpoint} - car not paired or no local token`);
+            // Return empty data structure based on endpoint
+            if (endpoint.includes('notifications')) return [];
+            if (endpoint.includes('sync')) return { readings: [], diagnostics: [], events: [] };
+            return null;
+          }
+        }
+      }
+      
+      const api = isLocalEndpoint ? apiInstance.getLocalApi() : apiInstance.getRemoteApi();
+      
+      const config = {
+        method,
+        url: endpoint,
+        ...options,
+      };
+
+      if (data) {
+        if (method === 'get') {
+          config.params = data;
+        } else {
+          config.data = data;
+        }
+      }
+
+      const response = await api(config);
+      return response;
+    } catch (error) {
+      // Don't log errors for expected 401s on login page
+      if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
+        console.log('Expected 401 for:', error.config?.url);
+      } else {
+        console.error('Request error:', error.message);
+      }
+      throw error;
+    }
+  }
 
   // Convenience methods
   get(endpoint, params, options) {

@@ -14,7 +14,12 @@ class ErrorManager {
   // Handle errors silently without showing alerts
   handleError(error, context = '') {
     // Log error for debugging
-   
+       const silentContexts = [
+      'loadNotifications',
+      'fetchSensorData',
+      'syncService',
+      'getRecentNotifications'
+    ];
 
     // Check for network/connection errors
     if (this.isNetworkError(error)) {
@@ -35,7 +40,17 @@ class ErrorManager {
         silent: true
       };
     }
-
+    // Don't log errors for these contexts when on login page
+    if (silentContexts.includes(context)) {
+      // Check if it's a 401 or network error
+      if (error.response?.status === 401 || error.code === 'ECONNREFUSED') {
+        return {
+          type: 'auth',
+          message: 'Authentication required',
+          silent: true
+        };
+      }
+    }
     // Check for token errors
     if (this.isTokenError(error)) {
       console.log('Token error detected - suppressing');

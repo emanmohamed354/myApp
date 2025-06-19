@@ -11,7 +11,8 @@ import { sensorConfig } from '../../utils/sensorConfig';
 
 export default function CriticalSensorsSection({ sensorData }) {
   const insets = useSafeAreaInsets();
-  
+  const safeData = sensorData || {};
+
   return (
     <LinearGradient
       colors={[
@@ -91,7 +92,7 @@ export default function CriticalSensorsSection({ sensorData }) {
         {/* Center Layout with Main Indicator */}
         <View style={tw`items-center mb-4`}>
           <MainRPMIndicator
-            value={sensorData.ENGINE_RPM || 0}
+            value={safeData.ENGINE_RPM || 0}
             size={180}
           />
         </View>
@@ -100,21 +101,21 @@ export default function CriticalSensorsSection({ sensorData }) {
         <View style={tw`flex-row justify-around px-2`}>
           <View style={tw`items-center`}>
             <SensorIndicator
-              value={sensorData.VEHICLE_SPEED || 0}
+              value={safeData.VEHICLE_SPEED || 0}
               config={sensorConfig.critical.VEHICLE_SPEED}
               size={90}
             />
           </View>
           <View style={tw`items-center`}>
             <SensorIndicator
-              value={sensorData.ENGINE_COOLANT_TEMPERATURE || 0}
+              value={safeData.ENGINE_COOLANT_TEMPERATURE || 0}
               config={sensorConfig.critical.ENGINE_COOLANT_TEMPERATURE}
               size={90}
             />
           </View>
           <View style={tw`items-center`}>
             <SensorIndicator
-              value={sensorData.CALCULATED_ENGINE_LOAD || 0}
+              value={safeData.CALCULATED_ENGINE_LOAD || 0}
               config={sensorConfig.critical.ENGINE_LOAD}
               size={90}
             />
