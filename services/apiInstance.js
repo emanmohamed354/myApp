@@ -38,7 +38,6 @@ async initialize() {
     this.initialized = true;
     console.log('API instances initialized');
   } catch (error) {
-    console.error('Failed to initialize API instances:', error);
   }
 }
 

@@ -160,7 +160,6 @@ export default function LogsScreen({ navigation }) {
         );
       }
     } catch (err) {
-      console.error('Sync error:', err);
       setError('Failed to sync data');
       Alert.alert('Sync Error', 'Failed to sync data. Please try again.');
     } finally {
@@ -182,7 +181,6 @@ export default function LogsScreen({ navigation }) {
       const localData = await syncService.getLocalSyncData();
       setSyncData(localData || { readings: [], diagnostics: [], events: [] });
     } catch (error) {
-      console.error('Error loading sync data:', error);
       setSyncData({ readings: [], diagnostics: [], events: [] });
     }
   };
@@ -207,7 +205,6 @@ export default function LogsScreen({ navigation }) {
       // Animate items in
       animateItems(activeTab === 'diagnostic' ? diagnosticData : activeTab === 'events' ? eventsData : []);
     } catch (err) {
-      console.error('Error loading logs:', err);
       setError('Failed to load logs');
       setDiagnosticLogs([]);
       setEventLogs([]);

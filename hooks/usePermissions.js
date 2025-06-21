@@ -3,17 +3,24 @@ import { useState, useEffect } from 'react';
 import { Camera } from 'expo-camera';
 import { Audio } from 'expo-av';
 import * as Location from 'expo-location';
-import { Alert } from 'react-native';
+import { Alert, Platform, Linking } from 'react-native';
 
 export const usePermissions = () => {
   const [hasCameraPermission, setHasCameraPermission] = useState(null);
   const [hasAudioPermission, setHasAudioPermission] = useState(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
+  const [hasWifiPermission, setHasWifiPermission] = useState(null);
 
   useEffect(() => {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasCameraPermission(status === 'granted');
+            // Location permission (needed for WiFi on Android)
+      if (Platform.OS === 'android') {
+        const locationStatus = await Location.requestForegroundPermissionsAsync();
+        setHasLocationPermission(locationStatus.status === 'granted');
+        setHasWifiPermission(locationStatus.status === 'granted');
+      }
     })();
   }, []);
 
@@ -30,7 +37,7 @@ export const usePermissions = () => {
     if (status !== 'granted') {
       Alert.alert(
         'Location Permission Required',
-        'Please enable location services to find nearby centers',
+        'Please enable location services to find nearby centers and Wifi connection',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Settings', onPress: () => Linking.openSettings() }
@@ -41,7 +48,27 @@ export const usePermissions = () => {
     
     return true;
   };
-
+  const checkWifiPermissions = async () => {
+    if (Platform.OS === 'ios') return true; // No special permissions needed on iOS
+    
+    if (hasWifiPermission === null) {
+      return await requestLocationPermission();
+    }
+    
+    if (hasWifiPermission === false) {
+      Alert.alert(
+        'Location Permission Needed',
+        'Android requires location permission to manage WiFi connections',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Enable', onPress: () => requestLocationPermission() }
+        ]
+      );
+      return false;
+    }
+    
+    return true;
+  };
   const checkCameraPermission = async () => {
     if (hasCameraPermission === null) {
       const { status } = await Camera.requestCameraPermissionsAsync();
@@ -83,6 +110,9 @@ export const usePermissions = () => {
     requestAudioPermission,
     requestLocationPermission,
     checkCameraPermission,
-    checkLocationPermission
+    checkLocationPermission,
+    checkWifiPermissions,
+    hasWifiPermission,
+
   };
 };

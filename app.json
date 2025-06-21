@@ -21,11 +21,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.myApp",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby car maintenance centers and provide directions.",
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby car maintenance centers and provide directions and to help connect to your car's WiFi.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location to show nearby car maintenance centers and provide directions.",
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes for car pairing",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for audio recording"
-      },
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for audio recording"      },
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -40,7 +39,10 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "ACCESS_WIFI_STATE",
+        "CHANGE_WIFI_STATE",
+        "ACCESS_FINE_LOCATION"
       ],
       "package": "com.anonymous.myApp"
     },

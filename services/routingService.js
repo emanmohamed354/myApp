@@ -40,7 +40,6 @@ export const getRouteToDestination = async (origin, destination) => {
     
     return null;
   } catch (error) {
-    console.error('Error getting route:', error);
     throw error;
   }
 };

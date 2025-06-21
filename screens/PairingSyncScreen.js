@@ -105,7 +105,6 @@ export default function PairingSyncScreen({ navigation, route }) {
       }
       // If not paired, just show empty state instead of trying to sync
     } catch (err) {
-      console.error('Error loading sync data:', err);
       // Don't set error for loading issues
     } finally {
       setLoading(false);
@@ -155,7 +154,6 @@ export default function PairingSyncScreen({ navigation, route }) {
         await syncService.saveLocalSyncData(response);
       }
     } catch (err) {
-      console.error('Sync error:', err);
       setError('Failed to sync data. Please try again.');
     } finally {
       setSyncing(false);

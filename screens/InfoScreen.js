@@ -75,7 +75,6 @@ export default function InfoScreen({ navigation }) {
       console.log('Fetched car data:', response);
       setCarData(response);
     } catch (error) {
-      console.error('Error fetching car data:', error);
       setCarData(null);
     } finally {
       setLoading(false);

@@ -38,12 +38,10 @@ export class WebSocketService {
           const data = JSON.parse(event.data);
           this.handleMessage(data);
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
         this.notifySubscribers('error', error);
       };
 
@@ -53,7 +51,6 @@ export class WebSocketService {
         this.attemptReconnect();
       };
     } catch (error) {
-      console.error('Error creating WebSocket:', error);
     }
   }
 
@@ -95,7 +92,6 @@ export class WebSocketService {
         try {
           callback(data);
         } catch (error) {
-          console.error('Error in WebSocket subscriber:', error);
         }
       });
     }
@@ -126,7 +122,6 @@ export class WebSocketService {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     } else {
-      console.error('WebSocket is not connected');
     }
   }
 }

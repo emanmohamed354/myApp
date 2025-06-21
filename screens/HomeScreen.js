@@ -89,7 +89,6 @@ export default function HomeScreen({ navigation }) {
         console.warn('Invalid sensor response format:', response);
       }
     } catch (error) {
-      console.error('Error fetching sensor data:', error.message);
       
       // Don't set empty data on error - keep last known good data
       // Only log the error, don't disrupt the UI

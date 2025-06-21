@@ -41,7 +41,6 @@ export const searchNearbyCarCenters = async (latitude, longitude) => {
       return searchWithNominatim(latitude, longitude);
     }
   } catch (error) {
-    console.error('Error searching for car centers:', error);
     return searchWithNominatim(latitude, longitude);
   }
 };
@@ -121,7 +120,6 @@ const searchWithNominatim = async (latitude, longitude) => {
     const uniqueResults = removeDuplicates(allResults);
     return processNominatimData(uniqueResults, latitude, longitude);
   } catch (error) {
-    console.error('Nominatim search error:', error);
     throw error;
   }
 };
@@ -288,7 +286,6 @@ export const recalculateRoute = async (userLocation, destination) => {
     
     return null;
   } catch (error) {
-    console.error('Error recalculating route:', error);
     throw error;
   }
 };

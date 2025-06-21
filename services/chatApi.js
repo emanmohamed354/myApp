@@ -68,7 +68,6 @@ export const chatApi = {
           const fileInfo = await FileSystem.getInfoAsync(voiceFile);
           
           if (!fileInfo.exists) {
-            console.error('Voice file does not exist:', voiceFile);
             throw new Error('Voice file not found');
           }
           
@@ -86,7 +85,6 @@ export const chatApi = {
           
           formData.append('voiceFile', file);
         } catch (error) {
-          console.error('Error processing voice file:', error);
           throw error;
         }
       }
@@ -124,7 +122,6 @@ export const chatApi = {
         sensorDataUsed: response.sensor_data_used
       };
     } catch (error) {
-      console.error('Error sending message:', error.response?.data || error);
       throw error;
     }
   },

@@ -11,7 +11,6 @@ export const notificationApi = {
       console.log('Notifications fetched:', response?.length || 0);
       return response || [];
     } catch (error) {
-      console.error('Error fetching recent notifications:', error);
       
       // Return empty array instead of throwing for better UX
       if (error.response?.status === 404 || error.response?.status === 401) {
@@ -53,12 +52,10 @@ export const notificationApi = {
     } catch (error) {
       // Check if it's a 500 error and log more details
       if (error.response?.status === 500) {
-        console.error('Server error marking notifications as read. Response:', error.response?.data);
-        console.error('Request that caused error:', error.config?.data);
+
       } else if (error.response?.status === 404) {
         console.warn('Mark as read endpoint not found');
       } else {
-        console.error('Error marking notifications as read:', error);
       }
       
       // Don't throw - let the UI continue working

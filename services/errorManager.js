@@ -1,3 +1,4 @@
+// services/errorManager.js
 import { Alert } from 'react-native';
 
 class ErrorManager {
@@ -13,8 +14,8 @@ class ErrorManager {
 
   // Handle errors silently without showing alerts
   handleError(error, context = '') {
-    // Log error for debugging
-       const silentContexts = [
+    // Silent contexts list
+    const silentContexts = [
       'loadNotifications',
       'fetchSensorData',
       'syncService',
@@ -23,7 +24,7 @@ class ErrorManager {
 
     // Check for network/connection errors
     if (this.isNetworkError(error)) {
-      console.log('Network error detected - suppressing');
+      console.log(`[${context}] Network error detected - suppressing`);
       return {
         type: 'network',
         message: 'Connection error',
@@ -33,13 +34,14 @@ class ErrorManager {
 
     // Check for auth errors
     if (this.isAuthError(error)) {
-      console.log('Auth error detected - suppressing');
+      console.log(`[${context}] Auth error detected - suppressing`);
       return {
         type: 'auth',
         message: 'Authentication required',
         silent: true
       };
     }
+
     // Don't log errors for these contexts when on login page
     if (silentContexts.includes(context)) {
       // Check if it's a 401 or network error
@@ -51,15 +53,19 @@ class ErrorManager {
         };
       }
     }
+
     // Check for token errors
     if (this.isTokenError(error)) {
-      console.log('Token error detected - suppressing');
+      console.log(`[${context}] Token error detected - suppressing`);
       return {
         type: 'token',
         message: 'Token invalid or missing',
         silent: true
       };
     }
+
+    // Log the error with context
+    console.log(`[${context}] Error:`, error.message || error);
 
     // Default silent error
     return {
@@ -74,9 +80,11 @@ class ErrorManager {
       error.code === 'ECONNREFUSED' ||
       error.code === 'ENOTFOUND' ||
       error.code === 'ETIMEDOUT' ||
+      error.code === 'ECONNABORTED' ||
       error.message?.toLowerCase().includes('network') ||
       error.message?.toLowerCase().includes('connection') ||
-      !error.response && error.request
+      error.message?.toLowerCase().includes('timeout') ||
+      (!error.response && error.request)
     );
   }
 
@@ -98,16 +106,14 @@ class ErrorManager {
   }
 
   // Show error only if it's critical and user action is required
-    // Make sure showError respects suppressErrors
   showError(title, message, actions = []) {
     if (this.suppressErrors) {
-      console.log(  `Suppressed error: ${title} - ${message}`);
+      console.log(`Suppressed error alert: ${title} - ${message}`);
       return; // Don't show any alerts
     }
 
     Alert.alert(title, message, actions);
   }
-
 }
 
 export default new ErrorManager();

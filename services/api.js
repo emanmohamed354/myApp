@@ -133,7 +133,6 @@ class ApiService {
       if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
         console.log('Expected 401 for:', error.config?.url);
       } else {
-        console.error('Request error:', error.message);
       }
       throw error;
     }

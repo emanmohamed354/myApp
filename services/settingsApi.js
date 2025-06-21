@@ -16,7 +16,6 @@ export const settingsApi = {
       console.log('Settings update successful');
       return response;
     } catch (error) {
-      console.error('Settings update error:', error.response?.data || error);
       
       // If it's a 404, the endpoint might not exist yet
       if (error.response?.status === 404) {

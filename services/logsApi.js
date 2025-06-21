@@ -9,7 +9,6 @@ export const logsApi = {
         timeout: 10000,
       });
     } catch (error) {
-      console.error('Error fetching diagnostic logs:', error);
       if (error.response?.status === 404 || error.response?.status === 401) {
         return [];
       }
@@ -24,7 +23,6 @@ export const logsApi = {
         timeout: 10000,
       });
     } catch (error) {
-      console.error('Error fetching event logs:', error);
       if (error.response?.status === 404 || error.response?.status === 401) {
         return [];
       }
@@ -39,7 +37,6 @@ export const logsApi = {
         clearedAt: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Error clearing diagnostic code:', error);
       throw error;
     }
   }

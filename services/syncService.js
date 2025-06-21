@@ -23,7 +23,6 @@ export const syncService = {
       }
       return null;
     } catch (error) {
-      console.error('Error getting sync data from local API:', error);
       throw error;
     }
   },
@@ -49,7 +48,6 @@ export const syncService = {
       
       return response;
     } catch (error) {
-      console.error('Error syncing to remote:', error);
       throw error;
     }
   },
@@ -73,7 +71,6 @@ export const syncService = {
       
       await AsyncStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
     } catch (error) {
-      console.error('Error saving sync data:', error);
       throw error;
     }
   },
@@ -84,7 +81,6 @@ export const syncService = {
       const data = await AsyncStorage.getItem(SYNC_DATA_KEY);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Error getting local sync data:', error);
       return null;
     }
   },
@@ -95,7 +91,6 @@ export const syncService = {
       const data = await AsyncStorage.getItem(SENSOR_READINGS_KEY);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error('Error getting sensor readings:', error);
       return [];
     }
   },
@@ -106,7 +101,6 @@ export const syncService = {
       const data = await AsyncStorage.getItem(DIAGNOSTICS_KEY);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error('Error getting diagnostics:', error);
       return [];
     }
   },
@@ -117,7 +111,6 @@ export const syncService = {
       const data = await AsyncStorage.getItem(EVENTS_KEY);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error('Error getting events:', error);
       return [];
     }
   },
@@ -128,7 +121,6 @@ export const syncService = {
       const timestamp = await AsyncStorage.getItem(LAST_SYNC_KEY);
       return timestamp ? new Date(timestamp) : null;
     } catch (error) {
-      console.error('Error getting last sync time:', error);
       return null;
     }
   },
@@ -144,7 +136,6 @@ export const syncService = {
         EVENTS_KEY
       ]);
     } catch (error) {
-      console.error('Error clearing sync data:', error);
     }
   },
 
