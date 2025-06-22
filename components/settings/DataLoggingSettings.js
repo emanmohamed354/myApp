@@ -1,3 +1,4 @@
+// components/settings/DataLoggingSettings.js
 import React from 'react';
 import SettingsSection from './SettingsSection';
 import SettingItem from './SettingItem';

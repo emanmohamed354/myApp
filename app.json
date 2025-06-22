@@ -16,7 +16,9 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.myApp",
@@ -24,7 +26,8 @@
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby car maintenance centers and provide directions and to help connect to your car's WiFi.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location to show nearby car maintenance centers and provide directions.",
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes for car pairing",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for audio recording"      },
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for audio recording"
+      },
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -68,8 +71,14 @@
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes."
         }
-      ]
-    ]
-
+      ],
+      "react-native-vision-camera"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "dda96a68-a886-486c-a7b2-e65bcc14f310"
+      }
+    },
+    "owner": "eman263"
   }
 }

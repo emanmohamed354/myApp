@@ -72,71 +72,142 @@ const CarPairingScreen = ({ navigation }) => {
 
 
   const handleQrScan = async (data) => {
-      if (isScanningRef.current) {
-        console.log('[QR_SCAN] Scan already in progress, ignoring');
+    if (isScanningRef.current) {
+      console.log('[QR_SCAN] Scan already in progress, ignoring');
+      return;
+    }
+    
+    isScanningRef.current = true;
+    console.log('[QR_SCAN] 1. Starting handleQrScan');
+    console.log('[QR_SCAN] Raw data received:', data);
+    console.log('[QR_SCAN] Data type:', typeof data);
+    console.log('[QR_SCAN] Data length:', data?.length);
+    
+    try {
+      // Clean the data first
+      let cleanData = data;
+      if (typeof data === 'string') {
+        cleanData = data.trim();
+      }
+      
+      // Check if data looks incomplete (common Android issue)
+      if (cleanData && cleanData.length < 10 && !cleanData.includes('{')) {
+        console.log('[QR_SCAN] Data appears incomplete, showing help message');
+        Alert.alert(
+          'Incomplete QR Scan',
+          `Only received: "${cleanData}"\n\nThis might be an incomplete scan. Please:\n\n1. Hold your phone steady\n2. Ensure good lighting\n3. Position QR code fully within the frame\n4. Try scanning again`,
+          [
+            { text: 'Try Again', onPress: () => {} }
+          ]
+        );
         return;
       }
       
-      isScanningRef.current = true;
-      console.log('[QR_SCAN] 1. Starting handleQrScan');
+      console.log('[QR_SCAN] 2. Parsing QR data:', cleanData);
+      let qrData;
       
       try {
-        console.log('[QR_SCAN] 2. Parsing QR data');
-        let qrData;
-        try {
-          qrData = JSON.parse(data);
-          console.log('[QR_SCAN] 3. Parsed QR data:', qrData);
-        } catch (e) {
-          Alert.alert('Invalid QR Code', 'The scanned data is not valid JSON.');
-          return;
-        }
+        qrData = JSON.parse(cleanData);
+        console.log('[QR_SCAN] 3. Parsed QR data successfully:', qrData);
+      } catch (parseError) {
+        console.log('[QR_SCAN] JSON Parse Error:', parseError);
+        console.log('[QR_SCAN] Failed data:', cleanData);
         
-        if (!qrData.ip || !validateIp(qrData.ip)) {
-          Alert.alert('Invalid QR Code', 'The scanned QR code does not contain a valid IP address.');
-          return;
-        }
-        
-        console.log('[QR_SCAN] 4. Setting local IP:', qrData.ip);
-        setLocalIp(qrData.ip);
-        
-        try {
-          console.log('[QR_SCAN] 5. Saving IP to AsyncStorage');
-          await AsyncStorage.setItem('localIpAddress', qrData.ip);
-          console.log('[QR_SCAN] 6. IP saved successfully');
-        } catch (e) {
-          console.log('[QR_SCAN] Error saving IP to storage:', e);
-        }
-        
-        // Handle WiFi connection if present
-        if (qrData.ssid) {
-          console.log('[QR_SCAN] 7. Showing WiFi alert');
-          Alert.alert(
-            'Connect to Car WiFi',
-            `Your car's WiFi network is "${qrData.ssid}". Please connect to it in your device settings before pairing.`,
-            [
-              { 
-                text: 'OK', 
-                onPress: () => {
-                  console.log('[QR_SCAN] 8. WiFi alert OK pressed');
-                  showPairingConfirmation(qrData.ip);
-                }
-              }
-            ],
-            { cancelable: false }
-          );
+        // Check if this looks like it should be JSON but is malformed
+        if (cleanData.includes('{') || cleanData.includes('ip') || cleanData.includes('network')) {
+          // Try to fix common JSON issues
+          try {
+            // Remove any potential BOM or invisible characters
+            let sanitized = cleanData.replace(/^\uFEFF/, '').replace(/[\x00-\x1F\x7F]/g, '');
+            
+            // Try to fix common malformed JSON issues
+            if (!sanitized.startsWith('{') && sanitized.includes('{')) {
+              sanitized = sanitized.substring(sanitized.indexOf('{'));
+            }
+            if (!sanitized.endsWith('}') && sanitized.includes('}')) {
+              sanitized = sanitized.substring(0, sanitized.lastIndexOf('}') + 1);
+            }
+            
+            qrData = JSON.parse(sanitized);
+            console.log('[QR_SCAN] 3. Parsed sanitized data:', qrData);
+          } catch (secondError) {
+            console.log('[QR_SCAN] Second parse attempt failed:', secondError);
+            Alert.alert(
+              'Invalid QR Code', 
+              `The QR code data appears corrupted.\n\nReceived: "${cleanData}"\n\nPlease try scanning again with better lighting and hold the phone steady.`
+            );
+            return;
+          }
         } else {
-          console.log('[QR_SCAN] 7. No WiFi info, showing pairing confirmation');
-          showPairingConfirmation(qrData.ip);
+          // Data doesn't look like JSON at all
+          Alert.alert(
+            'Invalid QR Code',
+            `This doesn't appear to be a valid car pairing QR code.\n\nReceived: "${cleanData}"\n\nPlease make sure you're scanning the correct QR code from your car's display.`
+          );
+          return;
         }
-        
-      } catch (error) {
-        console.log('[QR_SCAN] ERROR in handleQrScan:', error);
-        console.log('[QR_SCAN] Error stack:', error.stack);
-        Alert.alert('Error', 'Failed to process QR code data.');
-      } finally {
-        isScanningRef.current = false;
       }
-    };
+      
+      // Validate the parsed data
+      if (!qrData || typeof qrData !== 'object') {
+        Alert.alert('Invalid QR Code', 'The QR code does not contain valid car pairing data.');
+        return;
+      }
+      
+      if (!qrData.ip) {
+        Alert.alert('Invalid QR Code', 'The QR code does not contain an IP address.');
+        return;
+      }
+      
+      if (!validateIp(qrData.ip)) {
+        Alert.alert('Invalid QR Code', `The IP address "${qrData.ip}" is not valid.`);
+        return;
+      }
+      
+      console.log('[QR_SCAN] 4. Setting local IP:', qrData.ip);
+      setLocalIp(qrData.ip);
+      
+      try {
+        console.log('[QR_SCAN] 5. Saving IP to AsyncStorage');
+        await AsyncStorage.setItem('localIpAddress', qrData.ip);
+        console.log('[QR_SCAN] 6. IP saved successfully');
+      } catch (storageError) {
+        console.log('[QR_SCAN] Error saving IP to storage:', storageError);
+      }
+      
+      // Handle WiFi connection if present
+      if (qrData.network) {
+        console.log('[QR_SCAN] 7. Showing WiFi alert');
+        Alert.alert(
+          'Connect to Car WiFi',
+          `Your car's WiFi network is "${qrData.network}". Please connect to it in your device settings before pairing.`,
+          [
+            { 
+              text: 'OK', 
+              onPress: () => {
+                console.log('[QR_SCAN] 8. WiFi alert OK pressed');
+                showPairingConfirmation(qrData.ip);
+              }
+            }
+          ],
+          { cancelable: false }
+        );
+      } else {
+        console.log('[QR_SCAN] 7. No WiFi info, showing pairing confirmation');
+        showPairingConfirmation(qrData.ip);
+      }
+      
+    } catch (error) {
+      console.log('[QR_SCAN] ERROR in handleQrScan:', error);
+      console.log('[QR_SCAN] Error stack:', error.stack);
+      Alert.alert('Error', `Failed to process QR code: ${error.message}`);
+    } finally {
+      // Reset the scanning flag after a short delay to prevent rapid re-triggers
+      setTimeout(() => {
+        isScanningRef.current = false;
+      }, 1000);
+    }
+  };
 
   const showPairingConfirmation = (ip) => {
     console.log('[QR_SCAN] 9. Showing pairing confirmation for IP:', ip);

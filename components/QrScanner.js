@@ -14,7 +14,6 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import tw from 'twrnc';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// Import Haptics at the top of the file
 import * as Haptics from 'expo-haptics';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -27,6 +26,8 @@ const QrScanner = ({ onScan, onClose }) => {
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const lastScanTime = useRef(0);
   const hasFiredScan = useRef(false);
+  const scanBuffer = useRef(''); // Buffer to collect scan data
+  const scanTimeout = useRef(null);
 
   useEffect(() => {
     if (permission?.granted) {
@@ -35,6 +36,9 @@ const QrScanner = ({ onScan, onClose }) => {
     return () => {
       scanLineAnim.stopAnimation();
       hasFiredScan.current = false;
+      if (scanTimeout.current) {
+        clearTimeout(scanTimeout.current);
+      }
     };
   }, [permission]);
 
@@ -56,17 +60,59 @@ const QrScanner = ({ onScan, onClose }) => {
   };
 
   const handleBarCodeScanned = ({ type, data }) => {
+    console.log('[QR_SCANNER] Scanned type:', type);
+    console.log('[QR_SCANNER] Scanned data:', data);
+    console.log('[QR_SCANNER] Data length:', data?.length);
+    
     // Prevent multiple scans
     const currentTime = Date.now();
-    if (scanned || hasFiredScan.current || currentTime - lastScanTime.current < 2000) {
+    if (scanned || hasFiredScan.current || currentTime - lastScanTime.current < 1000) {
+      console.log('[QR_SCANNER] Scan blocked - too recent or already processed');
       return;
     }
     
-    lastScanTime.current = currentTime;
+    // Check if data looks like complete JSON
+    const isCompleteJson = data && (
+      (data.startsWith('{') && data.endsWith('}')) ||
+      (data.startsWith('[') && data.endsWith(']'))
+    );
+    
+    if (!isCompleteJson && data && data.length < 50) {
+      // Might be partial data, try to buffer it
+      console.log('[QR_SCANNER] Partial data detected, buffering:', data);
+      scanBuffer.current += data;
+      
+      // Clear existing timeout
+      if (scanTimeout.current) {
+        clearTimeout(scanTimeout.current);
+      }
+      
+      // Set timeout to process buffered data
+      scanTimeout.current = setTimeout(() => {
+        console.log('[QR_SCANNER] Processing buffered data:', scanBuffer.current);
+        processScannedData(scanBuffer.current);
+        scanBuffer.current = '';
+      }, 500);
+      
+      return;
+    }
+    
+    // Process immediately if it looks complete
+    processScannedData(data);
+  };
+
+  const processScannedData = (data) => {
+    if (!data || hasFiredScan.current) {
+      return;
+    }
+    
+    lastScanTime.current = Date.now();
     setScanned(true);
     hasFiredScan.current = true;
     
-    // Vibration feedback - use the imported Haptics
+    console.log('[QR_SCANNER] Processing final data:', data);
+    
+    // Vibration feedback
     try {
       if (Haptics && Haptics.notificationAsync) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -129,10 +175,12 @@ const QrScanner = ({ onScan, onClose }) => {
       <CameraView
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
         barcodeScannerSettings={{
-          barcodeTypes: ['qr', 'pdf417'],
+          barcodeTypes: ['qr'],
         }}
         enableTorch={flashEnabled}
         style={StyleSheet.absoluteFillObject}
+        autoFocus="on"
+        ratio="16:9"
       />
 
       {/* Dark overlay with cutout */}
@@ -199,7 +247,7 @@ const QrScanner = ({ onScan, onClose }) => {
             Position QR code within frame
           </Text>
           <Text style={tw`text-gray-400 text-sm text-center`}>
-            Scanning will happen automatically
+            Hold steady for complete scan
           </Text>
         </View>
         

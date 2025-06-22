@@ -1,3 +1,4 @@
+// hooks/useSettings.js
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserSettings } from '../contexts/UserSettingsContext';
@@ -5,6 +6,10 @@ import { useUserSettings } from '../contexts/UserSettingsContext';
 export const useSettings = (navigation) => {
   const { isCarPaired, userInfo, remoteToken, logout, clearLocalToken } = useAuth();
   const { settings, updateSetting, syncing, loading } = useUserSettings();
+
+  useEffect(() => {
+    console.log('useSettings - Current settings:', settings);
+  }, [settings]);
 
   useEffect(() => {
     console.log('SettingsScreen - UserInfo:', userInfo);
@@ -18,10 +23,16 @@ export const useSettings = (navigation) => {
     }
   }, [isCarPaired, navigation]);
 
+  // Wrap updateSetting to add logging
+  const wrappedUpdateSetting = (path, value) => {
+    console.log('useSettings - Updating setting:', path, 'to:', value);
+    return updateSetting(path, value);
+  };
+
   return {
     isCarPaired,
     settings,
-    updateSetting,
+    updateSetting: wrappedUpdateSetting,
     syncing,
     loading,
     logout,

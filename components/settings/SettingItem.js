@@ -1,3 +1,4 @@
+// components/settings/SettingItem.js
 import React from 'react';
 import { View, Text, TouchableOpacity, Switch } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,7 +11,8 @@ const SettingItem = ({
   onPress, 
   onValueChange, 
   isSwitch, 
-  disabled 
+  disabled,
+  isLast = false 
 }) => {
   const content = (
     <View style={tw`flex-row items-center justify-between p-4 ${disabled ? 'opacity-50' : ''}`}>
@@ -37,15 +39,21 @@ const SettingItem = ({
     </View>
   );
 
+  const borderStyle = isLast ? {} : tw`border-b border-gray-700`;
+
   if (!isSwitch && onPress && !disabled) {
     return (
-      <TouchableOpacity onPress={onPress} style={tw`border-b border-gray-700 last:border-b-0`}>
+      <TouchableOpacity 
+        onPress={onPress} 
+        style={borderStyle}
+        activeOpacity={0.7}
+      >
         {content}
       </TouchableOpacity>
     );
   }
 
-  return <View style={tw`border-b border-gray-700 last:border-b-0`}>{content}</View>;
+  return <View style={borderStyle}>{content}</View>;
 };
 
 export default SettingItem;
