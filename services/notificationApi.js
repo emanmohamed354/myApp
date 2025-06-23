@@ -11,12 +11,12 @@ export const notificationApi = {
       console.log('Notifications fetched:', response?.length || 0);
       return response || [];
     } catch (error) {
-      
+
       // Return empty array instead of throwing for better UX
       if (error.response?.status === 404 || error.response?.status === 401) {
         return [];
       }
-      
+
       throw error;
     }
   },
@@ -27,21 +27,21 @@ export const notificationApi = {
       const idsArray = Array.isArray(notificationIds)
         ? notificationIds
         : [notificationIds];
-      
+
       // Skip if no IDs provided
       if (idsArray.length === 0) {
         return;
       }
-      
+
       console.log('Marking as read, sending IDs:', idsArray);
-      
+
       // Backend expects { ids: [...] } format
       const payload = {
         ids: idsArray
       };
-      
+
       console.log('Payload being sent:', JSON.stringify(payload));
-      
+
       return await api.patch(
         '/api/notifications/read',
         payload,
@@ -57,7 +57,7 @@ export const notificationApi = {
         console.warn('Mark as read endpoint not found');
       } else {
       }
-      
+
       // Don't throw - let the UI continue working
       return null;
     }

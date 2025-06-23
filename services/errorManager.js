@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 
 class ErrorManager {
   constructor() {
-    this.suppressErrors = true; // Global flag to suppress error popups
+    this.suppressErrors = false; // Global flag to suppress error popups
     this.errorHandlers = new Map();
   }
 
@@ -25,6 +25,7 @@ class ErrorManager {
     // Check for network/connection errors
     if (this.isNetworkError(error)) {
       console.log(`[${context}] Network error detected - suppressing`);
+      console.log(error);
       return {
         type: 'network',
         message: 'Connection error',
@@ -35,6 +36,7 @@ class ErrorManager {
     // Check for auth errors
     if (this.isAuthError(error)) {
       console.log(`[${context}] Auth error detected - suppressing`);
+      console.log(error);
       return {
         type: 'auth',
         message: 'Authentication required',

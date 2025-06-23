@@ -1,5 +1,4 @@
-// screens/CarPairingScreen.js
-import React, { useState, useEffect ,useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import tw from 'twrnc';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../services/authApi';
+import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Config from '../config/config';
@@ -45,7 +45,7 @@ const CarPairingScreen = ({ navigation }) => {
     fuelType: "Gasoline"
   });
   const [showScanner, setShowScanner] = useState(false);
-  const isScanningRef = useRef(false); 
+  const isScanningRef = useRef(false);
   useEffect(() => {
     loadSavedIp();
   }, []);
@@ -76,20 +76,20 @@ const CarPairingScreen = ({ navigation }) => {
       console.log('[QR_SCAN] Scan already in progress, ignoring');
       return;
     }
-    
+
     isScanningRef.current = true;
     console.log('[QR_SCAN] 1. Starting handleQrScan');
     console.log('[QR_SCAN] Raw data received:', data);
     console.log('[QR_SCAN] Data type:', typeof data);
     console.log('[QR_SCAN] Data length:', data?.length);
-    
+
     try {
       // Clean the data first
       let cleanData = data;
       if (typeof data === 'string') {
         cleanData = data.trim();
       }
-      
+
       // Check if data looks incomplete (common Android issue)
       if (cleanData && cleanData.length < 10 && !cleanData.includes('{')) {
         console.log('[QR_SCAN] Data appears incomplete, showing help message');
@@ -97,29 +97,29 @@ const CarPairingScreen = ({ navigation }) => {
           'Incomplete QR Scan',
           `Only received: "${cleanData}"\n\nThis might be an incomplete scan. Please:\n\n1. Hold your phone steady\n2. Ensure good lighting\n3. Position QR code fully within the frame\n4. Try scanning again`,
           [
-            { text: 'Try Again', onPress: () => {} }
+            { text: 'Try Again', onPress: () => { } }
           ]
         );
         return;
       }
-      
+
       console.log('[QR_SCAN] 2. Parsing QR data:', cleanData);
       let qrData;
-      
+
       try {
         qrData = JSON.parse(cleanData);
         console.log('[QR_SCAN] 3. Parsed QR data successfully:', qrData);
       } catch (parseError) {
         console.log('[QR_SCAN] JSON Parse Error:', parseError);
         console.log('[QR_SCAN] Failed data:', cleanData);
-        
+
         // Check if this looks like it should be JSON but is malformed
-        if (cleanData.includes('{') || cleanData.includes('ip') || cleanData.includes('network')) {
+        if (cleanData.includes('{') || cleanData.includes('ip') || cleanData.includes('ssid')) {
           // Try to fix common JSON issues
           try {
             // Remove any potential BOM or invisible characters
             let sanitized = cleanData.replace(/^\uFEFF/, '').replace(/[\x00-\x1F\x7F]/g, '');
-            
+
             // Try to fix common malformed JSON issues
             if (!sanitized.startsWith('{') && sanitized.includes('{')) {
               sanitized = sanitized.substring(sanitized.indexOf('{'));
@@ -127,13 +127,13 @@ const CarPairingScreen = ({ navigation }) => {
             if (!sanitized.endsWith('}') && sanitized.includes('}')) {
               sanitized = sanitized.substring(0, sanitized.lastIndexOf('}') + 1);
             }
-            
+
             qrData = JSON.parse(sanitized);
             console.log('[QR_SCAN] 3. Parsed sanitized data:', qrData);
           } catch (secondError) {
             console.log('[QR_SCAN] Second parse attempt failed:', secondError);
             Alert.alert(
-              'Invalid QR Code', 
+              'Invalid QR Code',
               `The QR code data appears corrupted.\n\nReceived: "${cleanData}"\n\nPlease try scanning again with better lighting and hold the phone steady.`
             );
             return;
@@ -147,43 +147,53 @@ const CarPairingScreen = ({ navigation }) => {
           return;
         }
       }
-      
+
       // Validate the parsed data
       if (!qrData || typeof qrData !== 'object') {
         Alert.alert('Invalid QR Code', 'The QR code does not contain valid car pairing data.');
         return;
       }
-      
+
       if (!qrData.ip) {
         Alert.alert('Invalid QR Code', 'The QR code does not contain an IP address.');
         return;
       }
-      
+
       if (!validateIp(qrData.ip)) {
         Alert.alert('Invalid QR Code', `The IP address "${qrData.ip}" is not valid.`);
         return;
       }
-      
+
       console.log('[QR_SCAN] 4. Setting local IP:', qrData.ip);
       setLocalIp(qrData.ip);
-      
+
       try {
         console.log('[QR_SCAN] 5. Saving IP to AsyncStorage');
         await AsyncStorage.setItem('localIpAddress', qrData.ip);
         console.log('[QR_SCAN] 6. IP saved successfully');
+
+        // Update the API instance base URL to use the new IP
+        const newLocalUrl = `http://${qrData.ip}:3000`;
+        console.log('[QR_SCAN] 6.5. Updating API base URL to:', newLocalUrl);
+        if (api && typeof api.updateBaseUrl === 'function') {
+          api.updateBaseUrl(newLocalUrl);
+          console.log('[QR_SCAN] 6.6. API base URL updated successfully');
+        } else {
+          console.log('[QR_SCAN] 6.6. API updateBaseUrl method not available');
+        }
       } catch (storageError) {
         console.log('[QR_SCAN] Error saving IP to storage:', storageError);
       }
-      
+
       // Handle WiFi connection if present
-      if (qrData.network) {
+      if (qrData.ssid) {
         console.log('[QR_SCAN] 7. Showing WiFi alert');
         Alert.alert(
           'Connect to Car WiFi',
-          `Your car's WiFi network is "${qrData.network}". Please connect to it in your device settings before pairing.`,
+          `Your car's WiFi network is "${qrData.ssid}". Please connect to it in your device settings before pairing.`,
           [
-            { 
-              text: 'OK', 
+            {
+              text: 'OK',
               onPress: () => {
                 console.log('[QR_SCAN] 8. WiFi alert OK pressed');
                 showPairingConfirmation(qrData.ip);
@@ -196,7 +206,7 @@ const CarPairingScreen = ({ navigation }) => {
         console.log('[QR_SCAN] 7. No WiFi info, showing pairing confirmation');
         showPairingConfirmation(qrData.ip);
       }
-      
+
     } catch (error) {
       console.log('[QR_SCAN] ERROR in handleQrScan:', error);
       console.log('[QR_SCAN] Error stack:', error.stack);
@@ -211,30 +221,30 @@ const CarPairingScreen = ({ navigation }) => {
 
   const showPairingConfirmation = (ip) => {
     console.log('[QR_SCAN] 9. Showing pairing confirmation for IP:', ip);
-    
+
     try {
       Alert.alert(
         'QR Code Scanned',
         `Successfully scanned IP: ${ip}\n\nWould you like to pair now?`,
         [
-          { 
-            text: 'Cancel', 
+          {
+            text: 'Cancel',
             style: 'cancel',
             onPress: () => console.log('[QR_SCAN] Cancel pressed')
           },
-          { 
-            text: 'Pair Now', 
+          {
+            text: 'Pair Now',
             onPress: async () => {
               console.log('[QR_SCAN] 10. Pair Now pressed');
               try {
                 setLoading(true);
                 const connectionValid = await testConnection(ip);
                 console.log('[QR_SCAN] 11. Connection test result:', connectionValid);
-                
+
                 if (connectionValid) {
                   console.log('[QR_SCAN] 12. Starting handlePairCar');
                   const result = await authApi.completePairingFlow(carData);
-                  
+
                   if (result.success) {
                     await setCarPaired(true);
                     console.log('[QR_SCAN] 13. Pairing successful, closing scanner and screen');
@@ -260,72 +270,72 @@ const CarPairingScreen = ({ navigation }) => {
       console.log('[QR_SCAN] Error stack:', error.stack);
     }
   };
-const testConnection = async (ip) => {
-  console.log('[TEST_CONN] 1. Starting connection test for IP:', ip);
-  setIsTestingConnection(true);
-  setIpError('');
-  
-  try {
-    // Only update config if it exists and has the method
+  const testConnection = async (ip) => {
+    console.log('[TEST_CONN] 1. Starting connection test for IP:', ip);
+    setIsTestingConnection(true);
+    setIpError('');
+
     try {
-      console.log('[TEST_CONN] 2. Updating config');
-      if (Config && typeof Config.updateLocalIp === 'function') {
-        await Config.updateLocalIp(ip);
-        console.log('[TEST_CONN] 3. Config updated successfully');
-      } else {
-        console.log('[TEST_CONN] 3. Config.updateLocalIp not available, using fallback');
-        await AsyncStorage.setItem('localIpAddress', ip);
+      // Only update config if it exists and has the method
+      try {
+        console.log('[TEST_CONN] 2. Updating config');
+        if (Config && typeof Config.updateLocalIp === 'function') {
+          await Config.updateLocalIp(ip);
+          console.log('[TEST_CONN] 3. Config updated successfully');
+        } else {
+          console.log('[TEST_CONN] 3. Config.updateLocalIp not available, using fallback');
+          await AsyncStorage.setItem('localIpAddress', ip);
+        }
+      } catch (configError) {
+        console.log('[TEST_CONN] Config update error:', configError);
+        // Continue anyway
       }
-    } catch (configError) {
-      console.log('[TEST_CONN] Config update error:', configError);
-      // Continue anyway
+
+      console.log('[TEST_CONN] 4. Creating test axios instance');
+      // Create a test axios instance
+      const testApi = axios.create({
+        baseURL: `http://${ip}:3000`,
+        timeout: 5000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('[TEST_CONN] 5. Making test request');
+      // Try to connect to the pairing endpoint
+      const response = await testApi.get('/api/auth/pairing-token');
+
+      console.log('[TEST_CONN] 6. Test request successful');
+      if (response.status === 200) {
+        setIpError('');
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.log('[TEST_CONN] Connection test failed:', error.message);
+
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        setIpError('Connection timeout. Please check if your car is on and connected to the same network.');
+      } else if (error.code === 'ECONNREFUSED') {
+        setIpError('Connection refused. Make sure your car system is running.');
+      } else if (error.response && error.response.status === 404) {
+        setIpError('Invalid endpoint. Please check if this is the correct car system.');
+      } else {
+        setIpError('Cannot connect. Please verify the IP address and network connection.');
+      }
+
+      return false;
+    } finally {
+      console.log('[TEST_CONN] 7. Connection test completed');
+      setIsTestingConnection(false);
     }
-    
-    console.log('[TEST_CONN] 4. Creating test axios instance');
-    // Create a test axios instance
-    const testApi = axios.create({
-      baseURL: `http://${ip}:3000`,
-      timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    console.log('[TEST_CONN] 5. Making test request');
-    // Try to connect to the pairing endpoint
-    const response = await testApi.get('/api/auth/pairing-token');
-    
-    console.log('[TEST_CONN] 6. Test request successful');
-    if (response.status === 200) {
-      setIpError('');
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.log('[TEST_CONN] Connection test failed:', error.message);
-    
-    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      setIpError('Connection timeout. Please check if your car is on and connected to the same network.');
-    } else if (error.code === 'ECONNREFUSED') {
-      setIpError('Connection refused. Make sure your car system is running.');
-    } else if (error.response && error.response.status === 404) {
-      setIpError('Invalid endpoint. Please check if this is the correct car system.');
-    } else {
-      setIpError('Cannot connect. Please verify the IP address and network connection.');
-    }
-    
-    return false;
-  } finally {
-    console.log('[TEST_CONN] 7. Connection test completed');
-    setIsTestingConnection(false);
-  }
-};
+  };
 
   const handlePairCar = async () => {
     // Prevent multiple simultaneous pairing attempts
     if (isPairing || loading) return;
-    
+
     setIpError('');
 
     if (!localIp || !validateIp(localIp)) {
@@ -335,21 +345,21 @@ const testConnection = async (ip) => {
 
     setLoading(true);
     setIsPairing(true);
-    
+
     try {
       const connectionValid = await testConnection(localIp);
-      
+
       if (!connectionValid) {
         return;
       }
 
       await AsyncStorage.setItem('localIpAddress', localIp);
-      
+
       const result = await authApi.completePairingFlow(carData);
-      
+
       if (result.success) {
         await setCarPaired(true);
-        
+
         // Use requestAnimationFrame for smoother navigation
         requestAnimationFrame(() => {
           navigation.replace('MainTabs');
@@ -357,10 +367,10 @@ const testConnection = async (ip) => {
       } else {
         throw new Error('Pairing failed');
       }
-      
+
     } catch (error) {
       console.log('Pairing error:', error);
-      
+
       if (error.message && error.message.includes('Network')) {
         setIpError('Network error. Please check your connection and try again.');
       } else if (error.message && (error.message.includes('401') || error.message.includes('auth'))) {
@@ -401,7 +411,7 @@ const testConnection = async (ip) => {
   const renderScannerOption = () => (
     <View style={tw`bg-gray-800 rounded-2xl p-6 mb-4`}>
       <Text style={tw`text-white text-xl font-bold mb-4`}>QR Code Pairing</Text>
-      
+
       <TouchableOpacity
         style={tw`bg-blue-600 rounded-lg py-4 flex-row items-center justify-center ${(loading || isPairing) ? 'opacity-60' : ''}`}
         onPress={() => setShowScanner(true)}
@@ -443,7 +453,7 @@ const testConnection = async (ip) => {
             />
           </TouchableOpacity>
         </View>
-        
+
         {showIpInput && (
           <View>
             <Text style={tw`text-gray-400 text-sm mb-2`}>
@@ -471,19 +481,19 @@ const testConnection = async (ip) => {
                 <ActivityIndicator size="small" color="#60A5FA" />
               )}
             </View>
-            
+
             {ipError && (
               <View style={tw`mt-2 bg-red-900/20 rounded-lg p-3`}>
                 <Text style={tw`text-red-400 text-sm`}>{ipError}</Text>
               </View>
             )}
-            
+
             {localIp && !validateIp(localIp) && !ipError && (
               <Text style={tw`text-red-400 text-xs mt-2`}>
                 Please enter a valid IP address format
               </Text>
             )}
-            
+
             <View style={tw`mt-4`}>
               <Text style={tw`text-gray-500 text-xs mb-2`}>Common local IPs:</Text>
               <View style={tw`flex-row flex-wrap`}>
@@ -493,7 +503,7 @@ const testConnection = async (ip) => {
                 <CommonIpButton ip="172.16.0.5" />
               </View>
             </View>
-            
+
             {localIp && validateIp(localIp) && (
               <TouchableOpacity
                 style={tw`bg-gray-700 rounded-lg px-4 py-2 mt-3 flex-row items-center justify-center`}
@@ -513,7 +523,7 @@ const testConnection = async (ip) => {
                 )}
               </TouchableOpacity>
             )}
-            
+
             <View style={tw`bg-blue-900/20 rounded-lg p-3 mt-4`}>
               <View style={tw`flex-row items-start`}>
                 <MaterialCommunityIcons name="information" size={16} color="#60A5FA" style={tw`mt-0.5 mr-2`} />
@@ -539,7 +549,7 @@ const testConnection = async (ip) => {
             <MaterialCommunityIcons name="pencil" size={24} color="#60A5FA" />
           </TouchableOpacity>
         </View>
-        
+
         <View style={tw`ml-3`}>
           <InfoRow label="Make" value={carData.make} />
           <InfoRow label="Model" value={carData.model} />
@@ -568,7 +578,7 @@ const testConnection = async (ip) => {
           </View>
         )}
       </TouchableOpacity>
-      
+
       <View style={tw`mt-4 mb-8`}>
         <Text style={tw`text-gray-500 text-xs text-center`}>
           Make sure your phone and car are on the same network
@@ -581,16 +591,16 @@ const testConnection = async (ip) => {
     <>
       <View style={tw`bg-gray-800 rounded-2xl p-6 mb-6`}>
         <Text style={tw`text-white text-xl font-bold mb-4`}>Edit Vehicle Details</Text>
-        
+
         <View style={tw`space-y-4`}>
-          <EditInput label="Make" value={carData.make} onChangeText={(text) => setCarData({...carData, make: text})} />
-          <EditInput label="Model" value={carData.model} onChangeText={(text) => setCarData({...carData, model: text})} />
-          <EditInput label="Year" value={carData.year.toString()} onChangeText={(text) => setCarData({...carData, year: parseInt(text) || 0})} keyboardType="numeric" />
-          <EditInput label="Trim" value={carData.trim} onChangeText={(text) => setCarData({...carData, trim: text})} />
-          <EditInput label="Color" value={carData.color} onChangeText={(text) => setCarData({...carData, color: text})} />
-          <EditInput label="Engine Size" value={carData.engineSize} onChangeText={(text) => setCarData({...carData, engineSize: text})} />
-          <EditInput label="Transmission" value={carData.transmission} onChangeText={(text) => setCarData({...carData, transmission: text})} />
-          <EditInput label="Fuel Type" value={carData.fuelType} onChangeText={(text) => setCarData({...carData, fuelType: text})} />
+          <EditInput label="Make" value={carData.make} onChangeText={(text) => setCarData({ ...carData, make: text })} />
+          <EditInput label="Model" value={carData.model} onChangeText={(text) => setCarData({ ...carData, model: text })} />
+          <EditInput label="Year" value={carData.year.toString()} onChangeText={(text) => setCarData({ ...carData, year: parseInt(text) || 0 })} keyboardType="numeric" />
+          <EditInput label="Trim" value={carData.trim} onChangeText={(text) => setCarData({ ...carData, trim: text })} />
+          <EditInput label="Color" value={carData.color} onChangeText={(text) => setCarData({ ...carData, color: text })} />
+          <EditInput label="Engine Size" value={carData.engineSize} onChangeText={(text) => setCarData({ ...carData, engineSize: text })} />
+          <EditInput label="Transmission" value={carData.transmission} onChangeText={(text) => setCarData({ ...carData, transmission: text })} />
+          <EditInput label="Fuel Type" value={carData.fuelType} onChangeText={(text) => setCarData({ ...carData, fuelType: text })} />
         </View>
       </View>
 
@@ -601,7 +611,7 @@ const testConnection = async (ip) => {
         >
           <Text style={tw`text-white text-center font-semibold`}>Cancel</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={tw`flex-1 bg-blue-600 rounded-2xl py-4 px-6`}
           onPress={handleSaveEdit}
@@ -618,7 +628,7 @@ const testConnection = async (ip) => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <StatusBar barStyle="light-content" />
-      
+
       <LinearGradient
         colors={['rgba(59, 130, 246, 0.3)', 'rgba(59, 130, 246, 0.1)']}
         style={{ paddingTop: insets.top }}
@@ -629,7 +639,7 @@ const testConnection = async (ip) => {
         </View>
       </LinearGradient>
 
-      <ScrollView 
+      <ScrollView
         style={tw`flex-1 px-6 pt-6`}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -647,13 +657,13 @@ const testConnection = async (ip) => {
           animationType="slide"
           onRequestClose={() => setShowScanner(false)}
         >
-        <QrScanner 
-          onScan={handleQrScan} 
-          onClose={() => {
-            console.log('[QR_SCAN] Scanner closed');
-            setShowScanner(false);
-          }} 
-        />
+          <QrScanner
+            onScan={handleQrScan}
+            onClose={() => {
+              console.log('[QR_SCAN] Scanner closed');
+              setShowScanner(false);
+            }}
+          />
         </Modal>
       </ScrollView>
     </KeyboardAvoidingView>

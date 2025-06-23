@@ -22,7 +22,7 @@ export const NotificationStateProvider = ({ children }) => {
 
   const loadNotifications = useCallback(async () => {
     // Don't load if not authenticated or no local token
-    if (!isAuthenticated || !isCarPaired || !localToken) {
+    if (!isAuthenticated && !isCarPaired && !localToken) {
       console.log('Skipping notifications - not ready');
       setNotifications([]);
       setUnreadCount(0);
@@ -31,15 +31,15 @@ export const NotificationStateProvider = ({ children }) => {
 
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const response = await notificationApi.getRecentNotifications(50);
-      
+
       // Ensure we always work with arrays
       const notificationsArray = Array.isArray(response) ? response : [];
-      
+
       setNotifications(notificationsArray);
-      
+
       const unread = notificationsArray.filter(n => n && !n.isRead).length;
       setUnreadCount(unread);
     } catch (err) {
@@ -54,7 +54,7 @@ export const NotificationStateProvider = ({ children }) => {
   // Update effect dependencies
   useEffect(() => {
     loadNotifications();
-    
+
     if (isAuthenticated && isCarPaired && localToken) {
       const interval = setInterval(loadNotifications, 30000);
       return () => clearInterval(interval);
@@ -65,24 +65,24 @@ export const NotificationStateProvider = ({ children }) => {
   const markAsRead = useCallback(async (notificationIds) => {
     try {
       const idsArray = Array.isArray(notificationIds) ? notificationIds : [notificationIds];
-      
+
       if (idsArray.length === 0) return;
-      
+
       // Update local state immediately
-      setNotifications(prev => 
-        prev.map(n => 
+      setNotifications(prev =>
+        prev.map(n =>
           idsArray.includes(n.id) ? { ...n, isRead: true } : n
         )
       );
-      
+
       // Update unread count
       setUnreadCount(prev => {
-        const markedCount = notifications.filter(n => 
+        const markedCount = notifications.filter(n =>
           !n.isRead && idsArray.includes(n.id)
         ).length;
         return Math.max(0, prev - markedCount);
       });
-      
+
       // Sync with backend (don't await)
       if (isAuthenticated && localToken) {
         notificationApi.markAsRead(idsArray).catch(err => {

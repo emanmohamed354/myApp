@@ -9,15 +9,17 @@ const LAST_SYNC_KEY = '@last_sync_timestamp';
 const SENSOR_READINGS_KEY = '@sensor_readings_data';
 const DIAGNOSTICS_KEY = '@diagnostics_data';
 const EVENTS_KEY = '@events_data';
+const SUMMARIES_KEY = '@summaries_data';
 
 export const syncService = {
   // Get sync data from local API (when paired)
- getLocalSyncDataFromAPI: async () => {
+  getLocalSyncDataFromAPI: async () => {
     try {
       const response = await api.get('/api/sync');
       console.log('Local sync GET response:', response);
-      
+
       if (response) {
+        console.log('Saving local sync data:', response);
         await syncService.saveLocalSyncData(response);
         return response;
       }
@@ -32,20 +34,21 @@ export const syncService = {
     try {
       // Get stored sync data
       const storedData = await syncService.getLocalSyncData();
-      
+
       const payload = {
         readings: storedData?.readings || [],
         diagnostics: storedData?.diagnostics || [],
-        events: storedData?.events || []
+        events: storedData?.events || [],
+        summaries: storedData?.summaries || []
       };
 
       console.log('Syncing to remote with payload:', payload);
-      
+
       // POST request to remote API (not /api prefix)
       const response = await api.post('/sync', payload);
-      
+
       console.log('Remote sync POST response:', response);
-      
+
       return response;
     } catch (error) {
       throw error;
@@ -56,19 +59,23 @@ export const syncService = {
   saveLocalSyncData: async (data) => {
     try {
       await AsyncStorage.setItem(SYNC_DATA_KEY, JSON.stringify(data));
-      
+
       if (data.readings) {
         await AsyncStorage.setItem(SENSOR_READINGS_KEY, JSON.stringify(data.readings));
       }
-      
+
       if (data.diagnostics) {
         await AsyncStorage.setItem(DIAGNOSTICS_KEY, JSON.stringify(data.diagnostics));
       }
-      
+
       if (data.events) {
         await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(data.events));
       }
-      
+
+      if (data.summaries) {
+        await AsyncStorage.setItem(SUMMARIES_KEY, JSON.stringify(data.summaries));
+      }
+
       await AsyncStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
     } catch (error) {
       throw error;
@@ -115,6 +122,16 @@ export const syncService = {
     }
   },
 
+  // Get summaries
+  getSummaries: async () => {
+    try {
+      const data = await AsyncStorage.getItem(SUMMARIES_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      return [];
+    }
+  },
+
   // Get last sync timestamp
   getLastSyncTime: async () => {
     try {
@@ -129,11 +146,12 @@ export const syncService = {
   clearSyncData: async () => {
     try {
       await AsyncStorage.multiRemove([
-        SYNC_DATA_KEY, 
-        LAST_SYNC_KEY, 
+        SYNC_DATA_KEY,
+        LAST_SYNC_KEY,
         SENSOR_READINGS_KEY,
         DIAGNOSTICS_KEY,
-        EVENTS_KEY
+        EVENTS_KEY,
+        SUMMARIES_KEY
       ]);
     } catch (error) {
     }
@@ -143,7 +161,7 @@ export const syncService = {
   needsSync: async () => {
     const lastSync = await syncService.getLastSyncTime();
     if (!lastSync) return true;
-    
+
     const hoursSinceSync = (new Date() - lastSync) / (1000 * 60 * 60);
     return hoursSinceSync > 1;
   }

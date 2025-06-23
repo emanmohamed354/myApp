@@ -6,21 +6,22 @@ import DiagnosticLog from './DiagnosticLog';
 import EventLog from './EventLog';
 import SyncStatusCard from './SyncStatusCard';
 
-const SyncData = ({ 
-  syncData, 
-  lastSyncTime, 
-  isSyncing, 
-  onSync, 
+const SyncData = ({
+  syncData,
+  lastSyncTime,
+  isSyncing,
+  onSync,
   iconRotateAnim,
   itemAnimations,
   fadeAnim,
-  onClearCode 
+  onClearCode
 }) => {
   const hasDiagnostics = syncData.diagnostics && syncData.diagnostics.length > 0;
   const hasEvents = syncData.events && syncData.events.length > 0;
   const hasReadings = Array.isArray(syncData) && syncData.length > 0;
-  
-  if (!hasReadings && !hasDiagnostics && !hasEvents) {
+  const hasSummaries = syncData.summaries && syncData.summaries.length > 0;
+
+  if (!hasReadings && !hasDiagnostics && !hasEvents && !hasSummaries) {
     return (
       <View style={tw`flex-1 items-center justify-center py-20`}>
         <MaterialCommunityIcons name="cloud-sync" size={80} color="#4B5563" />
@@ -35,10 +36,10 @@ const SyncData = ({
           disabled={isSyncing}
           style={tw`bg-blue-600 rounded-lg px-6 py-3 mt-6 flex-row items-center`}
         >
-          <MaterialCommunityIcons 
-            name="sync" 
-            size={20} 
-            color="#fff" 
+          <MaterialCommunityIcons
+            name="sync"
+            size={20}
+            color="#fff"
             style={tw`mr-2`}
           />
           <Text style={tw`text-white font-semibold`}>

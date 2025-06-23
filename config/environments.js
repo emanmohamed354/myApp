@@ -1,8 +1,8 @@
 // config/environments.js
 const ENV = {
   dev: {
-    apiUrl: 'http://192.168.1.5:4000',
-    wsUrl: 'ws://192.168.1.5:4000',
+    apiUrl: 'http://192.168.100.14:4000',
+    wsUrl: 'ws://192.168.100.14:4000',
     environment: 'development',
     enableDebugTools: true,
     mockData: false,

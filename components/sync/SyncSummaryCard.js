@@ -8,7 +8,9 @@ import tw from 'twrnc';
 const SyncSummaryCard = ({ syncData, fadeAnim, pulseAnim }) => {
   const readingsCount = syncData?.readings?.length || 0;
   const diagnosticsCount = syncData?.diagnostics?.length || 0;
-  const criticalCount = syncData?.readings?.filter(r => 
+  const summariesCount = syncData?.summaries?.length || 0;
+  const eventsCount = syncData?.events?.length || 0;
+  const criticalCount = syncData?.readings?.filter(r =>
     Object.values(r.readings).some(sensor => sensor.severity === 'critical')
   ).length || 0;
 
@@ -33,23 +35,37 @@ const SyncSummaryCard = ({ syncData, fadeAnim, pulseAnim }) => {
         </View>
 
         <View style={tw`flex-row justify-around mt-6`}>
-          <StatItem 
-            count={readingsCount} 
-            label="Readings" 
-            icon="gauge" 
-            color="#3B82F6" 
+          <StatItem
+            count={readingsCount}
+            label="Readings"
+            icon="gauge"
+            color="#3B82F6"
           />
-          <StatItem 
-            count={diagnosticsCount} 
-            label="Diagnostics" 
-            icon="car-cog" 
-            color="#F59E0B" 
+          <StatItem
+            count={diagnosticsCount}
+            label="Diagnostics"
+            icon="car-cog"
+            color="#F59E0B"
           />
-          <StatItem 
-            count={criticalCount} 
-            label="Critical" 
-            icon="alert-octagon" 
-            color="#EF4444" 
+          <StatItem
+            count={criticalCount}
+            label="Critical"
+            icon="alert-octagon"
+            color="#EF4444"
+          />
+        </View>
+        <View style={tw`flex-row justify-around mt-6`}>
+          <StatItem
+            count={summariesCount}
+            label="Summaries"
+            icon="chart-box"
+            color="#10B981"
+          />
+          <StatItem
+            count={eventsCount}
+            label="Events"
+            icon="history"
+            color="#10B981"
           />
         </View>
       </LinearGradient>

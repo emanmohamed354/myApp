@@ -9,37 +9,37 @@ class ApiInstance {
     this.initialized = false;
   }
 
-// services/apiInstance.js
-async initialize() {
-  if (this.initialized) return;
+  // services/apiInstance.js
+  async initialize() {
+    if (this.initialized) return;
 
-  try {
-    const remoteUrl = await Config.getRemoteApiUrl();
-    const localUrl = await Config.getLocalApiUrl();
+    try {
+      const remoteUrl = await Config.getRemoteApiUrl();
+      const localUrl = await Config.getLocalApiUrl();
 
-    // Remote API instance
-    this.remoteApi = axios.create({
-      baseURL: remoteUrl,
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+      // Remote API instance
+      this.remoteApi = axios.create({
+        baseURL: remoteUrl,
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-    // Local API instance with shorter timeout
-    this.localApi = axios.create({
-      baseURL: localUrl,
-      timeout: 3000, // 3 seconds for local connection test
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+      // Local API instance with shorter timeout
+      this.localApi = axios.create({
+        baseURL: localUrl,
+        timeout: 3000, // 3 seconds for local connection test
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-    this.initialized = true;
-    console.log('API instances initialized');
-  } catch (error) {
+      this.initialized = true;
+      console.log('API instances initialized');
+    } catch (error) {
+    }
   }
-}
 
   getRemoteApi() {
     if (!this.remoteApi) {

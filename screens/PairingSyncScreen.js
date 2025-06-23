@@ -38,9 +38,9 @@ export default function PairingSyncScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const carPayload = route.params?.carPayload || {};
-  
+
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -85,11 +85,11 @@ export default function PairingSyncScreen({ navigation, route }) {
     try {
       setLoading(true);
       setError(null);
-      
+
       // First, try to get locally stored sync data
       const localData = await syncService.getLocalSyncData();
-      
-      if (localData && (localData.readings?.length > 0 || localData.diagnostics?.length > 0)) {
+
+      if (localData && (localData.readings?.length > 0 || localData.diagnostics?.length > 0 || localData.summaries?.length > 0 || localData.events?.length > 0)) {
         setSyncData(localData);
       } else if (isCarPaired && localToken) {
         // If paired and no local data, try to fetch from local API
@@ -117,7 +117,7 @@ export default function PairingSyncScreen({ navigation, route }) {
 
     try {
       let response;
-      
+
       if (isCarPaired && localToken) {
         // If paired, get sync data from local API
         console.log('Getting sync data from local API...');
@@ -125,14 +125,14 @@ export default function PairingSyncScreen({ navigation, route }) {
       } else if (remoteToken) {
         // If not paired but authenticated, try to sync any stored data to remote
         const storedData = await syncService.getLocalSyncData();
-        
-        if (storedData && (storedData.readings?.length > 0 || storedData.diagnostics?.length > 0)) {
+
+        if (storedData && (storedData.readings?.length > 0 || storedData.diagnostics?.length > 0 || storedData.summaries?.length > 0 || storedData.events?.length > 0)) {
           console.log('Syncing stored data to remote API...');
           response = await syncService.syncToRemote();
-          
+
           // After successful remote sync, clear local data
           await syncService.clearSyncData();
-          
+
           Alert.alert(
             'Sync Complete',
             'Your stored vehicle data has been synced to the cloud.'
@@ -148,7 +148,7 @@ export default function PairingSyncScreen({ navigation, route }) {
         setError('Not authenticated. Please login first.');
         return;
       }
-      
+
       if (response) {
         setSyncData(response);
         await syncService.saveLocalSyncData(response);
@@ -161,13 +161,13 @@ export default function PairingSyncScreen({ navigation, route }) {
   };
 
   const handleContinue = () => {
-    navigation.replace('CarPairing', { 
+    navigation.replace('CarPairing', {
       syncData: syncData,
       carPayload: carPayload,
       fromSync: true
     });
   };
-    const handleBack = () => {
+  const handleBack = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
@@ -194,14 +194,14 @@ export default function PairingSyncScreen({ navigation, route }) {
       return <ErrorState error={error} onRetry={performSync} />;
     }
 
-    if (!syncData || (!syncData.readings?.length && !syncData.diagnostics?.length)) {
+    if (!syncData || (!syncData.readings?.length && !syncData.diagnostics?.length && !syncData.summaries?.length && !syncData.events?.length)) {
       return <EmptySyncState onSync={performSync} syncing={syncing} />;
     }
 
     return (
       <>
-        <SyncSummaryCard 
-          syncData={syncData} 
+        <SyncSummaryCard
+          syncData={syncData}
           fadeAnim={fadeAnim}
           pulseAnim={pulseAnim}
         />
@@ -213,6 +213,8 @@ export default function PairingSyncScreen({ navigation, route }) {
         {syncData.diagnostics && syncData.diagnostics.length > 0 && (
           <DiagnosticsSection diagnostics={syncData.diagnostics} fadeAnim={fadeAnim} />
         )}
+
+        {/* Add sections for summaries and events logs here */}
       </>
     );
   };
@@ -220,14 +222,14 @@ export default function PairingSyncScreen({ navigation, route }) {
   return (
     <View style={tw`flex-1 bg-gray-900`}>
       <StatusBar barStyle="light-content" />
-      
-      <SyncHeader 
+
+      <SyncHeader
         insets={insets}
         onBack={handleBack}
         onSkip={handleSkip}
       />
 
-      <ScrollView 
+      <ScrollView
         style={tw`flex-1`}
         contentContainerStyle={tw`px-6 py-6`}
         showsVerticalScrollIndicator={false}
