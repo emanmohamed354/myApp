@@ -5,11 +5,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const ENV = {
   dev: {
     apiUrl: 'http://192.168.100.14:3000', // Default, will be overridden
-    remoteUrl: 'http://192.168.100.14:4000',
+    remoteUrl: 'https://9dd7dq9r-4000.euw.devtunnels.ms',
   },
   prod: {
-    apiUrl: 'https://your-production-api.com',
-    remoteUrl: 'https://your-remote-api.com',
+    apiUrl: 'https://9dd7dq9r-4000.euw.devtunnels.ms',
+    remoteUrl: 'https://9dd7dq9r-4000.euw.devtunnels.ms',
   }
 };
 
