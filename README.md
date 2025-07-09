@@ -148,10 +148,3 @@ Mobile App (React Native)
 
 - Fleet dashboards for B2B
 
-## 📄 License
-
-This project is currently under private development. Licensing to be determined.
-
-## 👩‍💻 Authors
-
-Built by the AutoCare Team – delivering smarter diagnostics and next-gen automotive AI.
