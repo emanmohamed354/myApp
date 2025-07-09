@@ -1,46 +1,26 @@
-\# 🚗 AutoCare
+# 🚗 AutoCare
 
+**AutoCare** is a comprehensive mobile platform built with **React Native** that connects your smartphone to your vehicle’s OBD-II system. Designed for modern automotive needs, it empowers users with real-time diagnostics, AI assistance, predictive maintenance, and offline functionality—all wrapped in a sleek, performant, and secure architecture.
 
+## 📱 Key Features
 
-\*\*AutoCare\*\* is a comprehensive mobile platform built with \*\*React Native\*\* that connects your smartphone to your vehicle’s OBD-II system. Designed for modern automotive needs, it empowers users with real-time diagnostics, AI assistance, predictive maintenance, and offline functionality—all wrapped in a sleek, performant, and secure architecture.
+- **Real-Time OBD-II Integration:** Live data from vehicle sensors via WebSocket
 
+- **AI Assistant:** Multimodal chat (voice, image, text) powered by NLP and vision models
 
+- **Predictive Maintenance:** Machine learning-based failure prediction (oil, brakes, battery)
 
----
+- **Location Services:** Nearby service center discovery with smart ranking and routing
 
+- **Offline Support:** Dual JWT token architecture for local + remote access
 
+- **Secure Authentication:** JWT-based, biometric-ready, encrypted storage
 
-\## 📱 Key Features
+- **Modern UI/UX:** Automotive-inspired glassmorphism design, responsive layouts, 60 FPS animations
 
+## 🏗️ Architecture Overview
 
-
-\- \*\*Real-Time OBD-II Integration:\*\* Live data from vehicle sensors via WebSocket
-
-\- \*\*AI Assistant:\*\* Multimodal chat (voice, image, text) powered by NLP and vision models
-
-\- \*\*Predictive Maintenance:\*\* Machine learning-based failure prediction (oil, brakes, battery)
-
-\- \*\*Location Services:\*\* Nearby service center discovery with smart ranking and routing
-
-\- \*\*Offline Support:\*\* Dual JWT token architecture for local + remote access
-
-\- \*\*Secure Authentication:\*\* JWT-based, biometric-ready, encrypted storage
-
-\- \*\*Modern UI/UX:\*\* Automotive-inspired glassmorphism design, responsive layouts, 60 FPS animations
-
-
-
----
-
-
-
-\## 🏗️ Architecture Overview
-
-
-
-\### 1. Layered Architecture
-
-
+### 1. Layered Architecture
 
 Mobile App (React Native)
 
@@ -52,11 +32,7 @@ Mobile App (React Native)
 
 └── Infrastructure Layer (Utils, Error Handling, Security)
 
-
-
-\### 2. Dual Backend System
-
-
+### 2. Dual Backend System
 
 | Remote Backend (Cloud) | Local Backend (Vehicle) |
 
@@ -64,219 +40,118 @@ Mobile App (React Native)
 
 | Auth, AI, Push, Location | OBD-II, WebSocket, Local Auth |
 
+## 🔐 Authentication & Pairing
 
+- Remote JWT token via cloud backend
 
----
+- Pairing token via local vehicle API
 
+- Secure dual-token system with auto-refresh and double encryption
 
+- Local storage using Keychain (iOS) / Android Keystore
 
-\## 🔐 Authentication \& Pairing
+## 📡 Real-Time Sensor Monitoring
 
+- WebSocket connection to vehicle
 
+- Sensor fusion using Moving Average and Kalman filters
 
-\- Remote JWT token via cloud backend
+- Health scoring and live feedback
 
-\- Pairing token via local vehicle API
+- Optimized state management using Context + useRef
 
-\- Secure dual-token system with auto-refresh and double encryption
+## 🧠 AI Assistant (LLM + CV)
 
-\- Local storage using Keychain (iOS) / Android Keystore
+- **Voice input** (via Whisper API)
 
+- **Image recognition** (via Vision API)
 
+- **Smart text queries** based on current vehicle state
 
----
+- Contextual awareness + vector DB (e.g., Pinecone)
 
+## 🛠️ Predictive Maintenance
 
+- **Oil life:** LSTM model
 
-\## 📡 Real-Time Sensor Monitoring
+- **Brake wear:** Random Forest
 
+- **Battery health:** SVR regression
 
+- Predicts service needs with 87–92% confidence
 
-\- WebSocket connection to vehicle
+## 📍 Location-Based Features
 
-\- Sensor fusion using Moving Average and Kalman filters
+- Finds nearest service centers (via OpenStreetMap APIs)
 
-\- Health scoring and live feedback
+- Smart ranking: distance, availability, rating, etc.
 
-\- Optimized state management using Context + `useRef`
+- Real-time navigation with voice guidance and re-routing
 
+## 📊 Performance & Optimization
 
+- List virtualization (FlatList optimizations)
 
----
+- Memoization of expensive UI calculations
 
+- Image caching + fade-in rendering
 
+- Native driver animations (60 FPS guaranteed)
 
-\## 🧠 AI Assistant (LLM + CV)
+## 🧪 Testing & QA
 
+- **Unit Tests**: 70% coverage target
 
+- **Integration Tests**: API, navigation, context
 
-\- \*\*Voice input\*\* (via Whisper API)
+- **E2E Tests**: Detox flows for pairing, booking, emergency
 
-\- \*\*Image recognition\*\* (via Vision API)
+- **UX Metrics**: 99.5% crash-free sessions, 4.6/5 app rating
 
-\- \*\*Smart text queries\*\* based on current vehicle state
+## 🧰 Tech Stack
 
-\- Contextual awareness + vector DB (e.g., Pinecone)
+- React Native + Expo
 
+- Context API, WebSocket, AsyncStorage, SQLite
 
+- AI: Whisper, GPT, MobileNet, BERT, Chroma/Pinecone
 
----
+- Security: AES-256, TLS 1.3, certificate pinning
 
+- Backend: Cloud + Raspberry Pi-based local API
 
+## ⚙️ Requirements
 
-\## 🛠️ Predictive Maintenance
+### Mobile App
 
+- Android 6.0+ / iOS 12+
 
+- 2GB RAM (min), 4GB recommended
 
-\- \*\*Oil life:\*\* LSTM model
+- Bluetooth 4.0+ and GPS
 
-\- \*\*Brake wear:\*\* Random Forest
+### Vehicle Hardware
 
-\- \*\*Battery health:\*\* SVR regression
+- ELM327 OBD-II adapter (Bluetooth/WiFi)
 
-\- Predicts service needs with 87–92% confidence
+- Local computer (e.g., Raspberry Pi 4)
 
+## 🧭 Future Roadmap
 
+- Augmented Reality (AR) navigation
 
----
+- CAN bus direct integration (beyond OBD-II)
 
+- Voice-controlled diagnostics & navigation
 
+- Community features & gamification
 
-\## 📍 Location-Based Features
+- Fleet dashboards for B2B
 
-
-
-\- Finds nearest service centers (via OpenStreetMap APIs)
-
-\- Smart ranking: distance, availability, rating, etc.
-
-\- Real-time navigation with voice guidance and re-routing
-
-
-
----
-
-
-
-\## 📊 Performance \& Optimization
-
-
-
-\- List virtualization (FlatList optimizations)
-
-\- Memoization of expensive UI calculations
-
-\- Image caching + fade-in rendering
-
-\- Native driver animations (60 FPS guaranteed)
-
-
-
----
-
-
-
-\## 🧪 Testing \& QA
-
-
-
-\- \*\*Unit Tests\*\*: 70% coverage target
-
-\- \*\*Integration Tests\*\*: API, navigation, context
-
-\- \*\*E2E Tests\*\*: Detox flows for pairing, booking, emergency
-
-\- \*\*UX Metrics\*\*: 99.5% crash-free sessions, 4.6/5 app rating
-
-
-
----
-
-
-
-\## 🧰 Tech Stack
-
-
-
-\- React Native + Expo
-
-\- Context API, WebSocket, AsyncStorage, SQLite
-
-\- AI: Whisper, GPT, MobileNet, BERT, Chroma/Pinecone
-
-\- Security: AES-256, TLS 1.3, certificate pinning
-
-\- Backend: Cloud + Raspberry Pi-based local API
-
-
-
----
-
-
-
-\## ⚙️ Requirements
-
-
-
-\### Mobile App
-
-\- Android 6.0+ / iOS 12+
-
-\- 2GB RAM (min), 4GB recommended
-
-\- Bluetooth 4.0+ and GPS
-
-
-
-\### Vehicle Hardware
-
-\- ELM327 OBD-II adapter (Bluetooth/WiFi)
-
-\- Local computer (e.g., Raspberry Pi 4)
-
-
-
----
-
-
-
-\## 🧭 Future Roadmap
-
-
-
-\- Augmented Reality (AR) navigation
-
-\- CAN bus direct integration (beyond OBD-II)
-
-\- Voice-controlled diagnostics \& navigation
-
-\- Community features \& gamification
-
-\- Fleet dashboards for B2B
-
-
-
----
-
-
-
-\## 📄 License
-
-
+## 📄 License
 
 This project is currently under private development. Licensing to be determined.
 
-
-
----
-
-
-
-\## 👩‍💻 Authors
-
-
+## 👩‍💻 Authors
 
 Built by the AutoCare Team – delivering smarter diagnostics and next-gen automotive AI.
-
-
-
