@@ -34,11 +34,17 @@ Mobile App (React Native)
 
 ### 2. Dual Backend System
 
-| Remote Backend (Cloud) | Local Backend (Vehicle) |
+- **Remote Backend (Cloud):**
+  - User Authentication
+  - AI and Machine Learning Services
+  - Push Notifications
+  - Location-based Services
 
-|------------------------|-------------------------|
-
-| Auth, AI, Push, Location | OBD-II, WebSocket, Local Auth |
+- **Local Backend (Vehicle):**
+  - OBD-II Data Interface
+  - Real-time Sensor Monitoring
+  - Local Authentication via Vehicle Computer
+  - WebSocket Server for Data Streaming
 
 ## 🔐 Authentication & Pairing
 
